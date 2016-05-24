@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="utf-8"?>
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <item
+        android:state_checked="false"
+        android:background="@drawable/standingman"
+        />
+    <item
+        android:state_checked="true"
+        android:drawable="@drawable/walkingman"/>
+    <!--<item-->
+        <!--android:state_checked="false"-->
+        <!-->-->
+        <!--<ripple xmlns:android="http://schemas.android.com/apk/res/android"-->
+        <!--android:color="@color/white"-->
+        <!-->-->
+        <!--<item>-->
+        <!--<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">-->
+        <!--<solid android:color="@color/white"/>-->
+        <!--</shape>-->
+        <!--</item>-->
+
+        <!--<item-->
+        <!--android:bottom="2dp">-->
+        <!--<shape-->
+        <!--android:shape="rectangle"-->
+        <!-->-->
+        <!--<solid android:color="@color/colorPrimary" />-->
+        <!--</shape>-->
+        <!--</item>-->
+        <!--</ripple>-->
+    <!--</item>-->
+
+    <!--<item-->
+        <!--android:state_checked="true"-->
+        <!-->-->
+        <!--<ripple xmlns:android="http://schemas.android.com/apk/res/android"-->
+        <!--android:color="@color/white"-->
+        <!-->-->
+        <!--<item>-->
+        <!--<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">-->
+        <!--<solid android:color="@color/colorAccent"/>-->
+        <!--</shape>-->
+        <!--</item>-->
+
+        <!--<item-->
+        <!--android:bottom="2dp">-->
+        <!--<shape-->
+        <!--android:shape="rectangle"-->
+        <!-->-->
+        <!--<solid android:color="@color/colorPrimary" />-->
+        <!--</shape>-->
+        <!--</item>-->
+        <!--</ripple>-->
+    <!--</item>-->
+
+</selector>
+
+
