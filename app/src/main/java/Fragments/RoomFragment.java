@@ -48,17 +48,19 @@ public class RoomFragment extends MyFragment {
     Coordinate max;
     RelativeLayout.LayoutParams params ;
     private ArrayList<Pair> estimoteCoordinates = new ArrayList<Pair>();
+
     public void onActivityCreated(Bundle savedInstanceState){
         super.onCreate(savedInstanceState);
 
         //static test
-         estimoteCoordinates.add(estimoteCoordinates.size(),new Pair("34355,23519", new Coordinate(0,0)));
-         estimoteCoordinates.add(estimoteCoordinates.size(),new Pair("42969,34317", new Coordinate(0,1.6f)));
-         estimoteCoordinates.add(estimoteCoordinates.size(),new Pair("11988,45406", new Coordinate(0,4)));
+         estimoteCoordinates.add(estimoteCoordinates.size(),new Pair("27817,23519", new Coordinate(0,0)));
+         estimoteCoordinates.add(estimoteCoordinates.size(),new Pair("40516,26553", new Coordinate(0,1.6f)));
+         estimoteCoordinates.add(estimoteCoordinates.size(),new Pair("62267,24288", new Coordinate(0,4)));
          estimoteCoordinates.add(estimoteCoordinates.size(),new Pair("53886,34857", new Coordinate(-4,4)));
-         estimoteCoordinates.add(estimoteCoordinates.size(),new Pair("40516,26553", new Coordinate(-5.6f,4)));
-         estimoteCoordinates.add(estimoteCoordinates.size(),new Pair("27817,37349", new Coordinate(-5.6f,1.6f)));
-         estimoteCoordinates.add(estimoteCoordinates.size(),new Pair("62267,24288", new Coordinate(-5.6f,0)));
+         estimoteCoordinates.add(estimoteCoordinates.size(),new Pair("11988,45406", new Coordinate(-5.6f,4)));
+         estimoteCoordinates.add(estimoteCoordinates.size(),new Pair("42969,34317", new Coordinate(-5.6f,1.6f)));
+         estimoteCoordinates.add(estimoteCoordinates.size(),new Pair("34355,23519", new Coordinate(-5.6f,0)));
+
 
         setRoom(new Room(estimoteCoordinates));
 
@@ -92,6 +94,11 @@ public class RoomFragment extends MyFragment {
         max = getRoom().getMaxValueOfCoordinates();
         Log.e("min", "("+min.getFirst()+","+min.getSecond()+")");
         Log.e("max", "("+max.getFirst()+","+max.getSecond()+")");
+        String coordinatesString = "";
+        for(int i = 0; i < getRoom().getCoordinates().size(); i++){
+            coordinatesString += ((Coordinate)getRoom().getCoordinates().get(i).second).getFirst() + "," + ((Coordinate)getRoom().getCoordinates().get(i).second).getSecond() + "\n";
+        }
+        Log.e("All Coordinates",coordinatesString);
 
     }
 
@@ -230,25 +237,19 @@ public class RoomFragment extends MyFragment {
                  if(sortedBeacons.size() < 3)
                     return;
 
-                Snackbar.make(getActivity().findViewById(R.id.rl), "Beacon1: "+ "("+ ((Beacon)sortedBeacons.get(0).first).getMajor() +","+ ((Beacon)sortedBeacons.get(0).first).getMinor()+")" , Snackbar.LENGTH_LONG)
-                        .setAction("Action", null).show();
-                 double x1 = getRoom().getXCoordinate((int)sortedBeacons.get(0).second);
-                 double y1 = getRoom().getYCoordinate((int)sortedBeacons.get(0).second);
-                 double r1 = getRoom().getApproximateDistance((int)sortedBeacons.get(0).second, Utils.computeAccuracy((Beacon) sortedBeacons.get(0).first))*getRoom().getScaleFactor();
+                double[] xArray= new double[3];
+                double[] yArray= new double[3];
+                double[] rArray= new double[3];
+                for(int i = 0; i< 3; i ++){
+                    xArray[i] = getRoom().getXCoordinate((int)sortedBeacons.get(i).second);
+                    yArray[i] = getRoom().getYCoordinate((int)sortedBeacons.get(i).second);
+                    rArray[i] = getRoom().getApproximateDistance((int)sortedBeacons.get(i).second, Utils.computeAccuracy((Beacon) sortedBeacons.get(i).first))*getRoom().getScaleFactor();
+                    if(rArray[i] == -1)
+                        return;
+                }
 
-                Snackbar.make(getActivity().findViewById(R.id.rl), "Beacon2: "+ "("+ ((Beacon)sortedBeacons.get(1).first).getMajor() +","+ ((Beacon)sortedBeacons.get(0).first).getMinor()+")" , Snackbar.LENGTH_LONG)
-                        .setAction("Action", null).show();
-                 double x2 = getRoom().getXCoordinate((int)sortedBeacons.get(1).second);
-                 double y2 = getRoom().getYCoordinate((int)sortedBeacons.get(1).second);
-                 double r2 = getRoom().getApproximateDistance((int)sortedBeacons.get(1).second, Utils.computeAccuracy((Beacon) sortedBeacons.get(1).first))*getRoom().getScaleFactor();
-
-                Snackbar.make(getActivity().findViewById(R.id.rl), "Beacon3: "+ "("+ ((Beacon)sortedBeacons.get(2).first).getMajor() +","+ ((Beacon)sortedBeacons.get(0).first).getMinor()+")" , Snackbar.LENGTH_LONG)
-                        .setAction("Action", null).show();
-                 double x3 = getRoom().getXCoordinate((int)sortedBeacons.get(2).second);
-                 double y3 = getRoom().getYCoordinate((int)sortedBeacons.get(2).second);
-                 double r3 = getRoom().getApproximateDistance((int)sortedBeacons.get(2).second, Utils.computeAccuracy((Beacon) sortedBeacons.get(2).first))*getRoom().getScaleFactor();
-                 int x = (int)computeX(x1, x2, x3, y1, y2, y3, r1, r2, r3);
-                 int y = (int) computeY(x1, x2, y1, y2, r1, r2, x);
+                 int x = (int)computeX(xArray[0], xArray[1], xArray[2], yArray[0], yArray[1], yArray[2], rArray[0], rArray[1], rArray[2]);
+                 int y = (int) computeY(xArray[0], xArray[1], yArray[0], yArray[1], rArray[0], rArray[1], x);
                  Coordinate sum = new Coordinate(x,y);
                                   
 //                 if(discovered.size()<3)

@@ -1,6 +1,7 @@
 package Classes;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 
 /**
  * Created by oessa_000 on 5/23/2016.
@@ -28,12 +29,25 @@ public class Circular2DArray {
     public double getAvg(int index){
         if(array[index].size() < size)
             return -1;
-        else{
-            double avg = 0;
-            for(double d: array[index]){
-                avg += d;
-            }
-            return avg/size;
+        double avg = 0;
+        for(double d: array[index]){
+            avg += d;
         }
+        return avg/size;
+
     }
+    public double getMedian(int index){
+        if(array[index].size() < size)
+            return -1;
+        double median = 0;
+        double[] temp = new double[array[index].size()];
+        for(int i = 0; i<temp.length; i++)
+            temp[i]= array[index].get(i);
+        Arrays.sort(temp);
+        if(temp.length %2 == 0)
+            median = (temp[temp.length / 2] + temp[temp.length / 2 - 1]) / 2;
+        else
+            median = temp[temp.length / 2];
+        return median ;
+        }
 }

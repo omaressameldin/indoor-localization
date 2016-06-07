@@ -15,7 +15,7 @@ public class Room {
     private float yTranslation;
     public Room(ArrayList<Pair> coordinates){
         this.estimotescoordinates = coordinates;
-        distances = new Circular2DArray(coordinates.size(), 5);
+        distances = new Circular2DArray(coordinates.size(), 10);
     }
 
     public float getlongestDistance(){
@@ -41,7 +41,7 @@ public class Room {
     }
 
     public Coordinate getMinValueOfCoordinates(){
-        Coordinate min = new Coordinate(0,0);
+        Coordinate min = new Coordinate(99999,99999);
         for(int i = 0; i< estimotescoordinates.size(); i++){
             if(((Coordinate)estimotescoordinates.get(i).second).getFirst() < min.getFirst())
                 min.setFirst(((Coordinate) estimotescoordinates.get(i).second).getFirst());
@@ -98,7 +98,7 @@ public class Room {
 
     public double getApproximateDistance(int index, double distance){
         distances.add(index, distance);
-        return distances.getAvg(index);
+        return distances.getMedian(index);
     }
 
     public ArrayList<Pair> getCoordinates(){
