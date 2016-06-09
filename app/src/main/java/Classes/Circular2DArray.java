@@ -81,7 +81,7 @@ public class Circular2DArray {
     }
 
     public void setStandardDeviation(int index){
-        if(array[index].size() < size || standardDeviations[index] > -1)
+        if(array[index].size() < size)
             return;
         double avg = getAvg(index);
         double standardDeviation = 0;
