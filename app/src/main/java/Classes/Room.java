@@ -15,7 +15,7 @@ public class Room {
     private float yTranslation;
     public Room(ArrayList<Pair> coordinates){
         this.estimotescoordinates = coordinates;
-        distances = new Circular2DArray(coordinates.size(), 20);
+        distances = new Circular2DArray(coordinates.size(), 10);
     }
 
     public float getlongestDistance(){

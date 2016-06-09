@@ -222,17 +222,18 @@ public class RoomFragment extends MyFragment {
                         discovered.add(new Pair(b,index));
                 }
 
-//                 ArrayList<Pair> sortedBeacons = mergeSortBeacons(discovered,0,discovered.size() -1);
-                 if(discovered.size() < 3)
+                 ArrayList<Pair> sortedBeacons = mergeSortBeacons(discovered,0,discovered.size() -1);
+                 if(sortedBeacons.size() < 3)
                     return;
 
                 double[] xArray= new double[3];
                 double[] yArray= new double[3];
                 double[] rArray= new double[3];
                 for(int i = 0; i< 3; i ++){
-                    xArray[i] = getRoom().getXCoordinate((int)discovered.get(i).second);
-                    yArray[i] = getRoom().getYCoordinate((int)discovered.get(i).second);
-                    rArray[i] = getRoom().getApproximateDistance((int)discovered.get(i).second, Utils.computeAccuracy((Beacon) discovered.get(i).first));
+                    xArray[i] = getRoom().getXCoordinate((int)sortedBeacons.get(i).second);
+                    yArray[i] = getRoom().getYCoordinate((int)sortedBeacons.get(i).second);
+                    rArray[i] = getRoom().getApproximateDistance((int)sortedBeacons.get(i).second, Utils.computeAccuracy((Beacon) sortedBeacons.get(i).first));
+                    Snackbar.make(getActivity().findViewById(R.id.rl), "size:" + getRoom().getDistances().getArray((int)sortedBeacons.get(i).second).size(), Snackbar.LENGTH_LONG).setAction("Action", null).show();
                     if(rArray[i] == -1)
                         return;
                 }

@@ -1,5 +1,7 @@
 package Classes;
 
+import android.util.Log;
+
 import java.util.ArrayList;
 import java.util.Arrays;
 
@@ -57,11 +59,12 @@ public class Circular2DArray {
         if(array[index].size() == 1)
             return -1;
         int toBeFiltered = (whereToAdd[index] == 0)? size - 1: whereToAdd[index] - 1;
-        int prevValue = toBeFiltered - 1;
+        int prevValue = (toBeFiltered == 0)? size-1 : toBeFiltered - 1;
+        Log.e("index",""+toBeFiltered);
         array[index].set(toBeFiltered,  0.95*array[index].get(prevValue) + 0.05*array[index].get(toBeFiltered));
-//        if(array[index].size() < size)
-//            return -1;
-//        else
+        if(array[index].size() < size)
+            return -1;
+        else
             return array[index].get(toBeFiltered);
 
     }
@@ -78,7 +81,7 @@ public class Circular2DArray {
     }
 
     public void setStandardDeviation(int index){
-        if(array[index].size() < size)
+        if(array[index].size() < size || standardDeviations[index] > -1)
             return;
         double avg = getAvg(index);
         double standardDeviation = 0;
@@ -104,4 +107,6 @@ public class Circular2DArray {
         return median ;
         }
     public double getStandardDeviation(int index){return standardDeviations[index];}
+    public ArrayList getArray(int index){return array[index];}
+
 }
