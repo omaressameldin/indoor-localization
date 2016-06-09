@@ -136,14 +136,14 @@ public class RoomFragment extends MyFragment {
         // canvas.drawLine(startPoint.getFirst(),startPoint.getSecond(),((Coordinate)coordinates.get(0).second).getFirst(),((Coordinate)coordinates.get(0).second).getSecond(),paint);
 
 
-         Coordinate startPoint = (coordinates.size() > 0)? (Coordinate)coordinates.get(0).second : new Coordinate(0,0) ;
-        for(int i = 0; i < coordinates.size(); i++){
-            ((Coordinate)coordinates.get(i).second).setFirst(((Coordinate)coordinates.get(i).second).getFirst() * getRoom().getScaleFactor() + getRoom().getXTranslation());
-            ((Coordinate)coordinates.get(i).second).setSecond(((Coordinate)coordinates.get(i).second).getSecond() * getRoom().getScaleFactor() + getRoom().getYTranslation());
-
-            if(i != 0)
-                canvas.drawLine(startPoint.getFirst(), startPoint.getSecond(), ((Coordinate)coordinates.get(i).second).getFirst(), ((Coordinate)coordinates.get(i).second).getSecond(), paint);
-            startPoint = (Coordinate)coordinates.get(i).second;
+         Coordinate startPoint =  new Coordinate(((Coordinate)coordinates.get(0).second).getFirst() * getRoom().getScaleFactor() + getRoom().getXTranslation(),
+                 ((Coordinate)coordinates.get(0).second).getSecond() * getRoom().getScaleFactor() + getRoom().getYTranslation());
+        Coordinate endPoint;
+        for(int i = 1; i < coordinates.size(); i++){
+            endPoint = new Coordinate(((Coordinate)coordinates.get(i).second).getFirst() * getRoom().getScaleFactor() + getRoom().getXTranslation(),
+                    ((Coordinate)coordinates.get(i).second).getSecond() * getRoom().getScaleFactor() + getRoom().getYTranslation());
+            canvas.drawLine(startPoint.getFirst(), startPoint.getSecond(), endPoint.getFirst(), endPoint.getSecond(), paint);
+            startPoint =endPoint;
             if(i == 1)
                 paint.setColor(Color.GREEN);
             if(i == 2)
@@ -157,7 +157,9 @@ public class RoomFragment extends MyFragment {
             if(i == 6)
                 paint.setColor(Color.CYAN);
         }
-        canvas.drawLine(startPoint.getFirst(),startPoint.getSecond(),((Coordinate)coordinates.get(0).second).getFirst(),((Coordinate)coordinates.get(0).second).getSecond(),paint);
+         endPoint = new Coordinate(((Coordinate)coordinates.get(0).second).getFirst() * getRoom().getScaleFactor() + getRoom().getXTranslation(),
+                 ((Coordinate)coordinates.get(0).second).getSecond() * getRoom().getScaleFactor() + getRoom().getYTranslation());
+        canvas.drawLine(startPoint.getFirst(),startPoint.getSecond(),endPoint.getFirst(),endPoint.getSecond(),paint);
     }
 
 
@@ -207,19 +209,6 @@ public class RoomFragment extends MyFragment {
         });
         getBeaconManager().setRangingListener(new BeaconManager.RangingListener() {
             public void onBeaconsDiscovered(Region region, List<Beacon> list) {
-                // if(list.size() < 1)
-                //     return ;
-                // temporary[beaconDetectedCount ++] = Utils.computeAccuracy(list.get(0));
-                // if(five){
-                //     avg = (temporary[0] + temporary[1] + temporary[2] + temporary[3] + temporary[4]) / 5 ;
-                // }
-                // if(beaconDetectedCount == 5){
-                //     beaconDetectedCount = 0;
-                //     five = true;
-                // }
-                // Snackbar.make(getActivity().findViewById(R.id.rl), "Normal Accuracy: " +   Utils.computeAccuracy(list.get(0)) + "\n"  + "RSSI: " + list.get(0).getRssi() , Snackbar.LENGTH_LONG)
-                //         .setAction("Action", null).show();
-
                 if(list.size() < 3)
                     return ;
 //                     Snackbar.make(getActivity().findViewById(R.id.rl), "in" , Snackbar.LENGTH_LONG)
@@ -233,17 +222,17 @@ public class RoomFragment extends MyFragment {
                         discovered.add(new Pair(b,index));
                 }
 
-                 ArrayList<Pair> sortedBeacons = mergeSortBeacons(discovered,0,discovered.size() -1);
-                 if(sortedBeacons.size() < 3)
+//                 ArrayList<Pair> sortedBeacons = mergeSortBeacons(discovered,0,discovered.size() -1);
+                 if(discovered.size() < 3)
                     return;
 
                 double[] xArray= new double[3];
                 double[] yArray= new double[3];
                 double[] rArray= new double[3];
                 for(int i = 0; i< 3; i ++){
-                    xArray[i] = getRoom().getXCoordinate((int)sortedBeacons.get(i).second);
-                    yArray[i] = getRoom().getYCoordinate((int)sortedBeacons.get(i).second);
-                    rArray[i] = getRoom().getApproximateDistance((int)sortedBeacons.get(i).second, Utils.computeAccuracy((Beacon) sortedBeacons.get(i).first))*getRoom().getScaleFactor();
+                    xArray[i] = getRoom().getXCoordinate((int)discovered.get(i).second);
+                    yArray[i] = getRoom().getYCoordinate((int)discovered.get(i).second);
+                    rArray[i] = getRoom().getApproximateDistance((int)discovered.get(i).second, Utils.computeAccuracy((Beacon) discovered.get(i).first));
                     if(rArray[i] == -1)
                         return;
                 }
@@ -251,7 +240,7 @@ public class RoomFragment extends MyFragment {
                  int x = (int)computeX(xArray[0], xArray[1], xArray[2], yArray[0], yArray[1], yArray[2], rArray[0], rArray[1], rArray[2]);
                  int y = (int) computeY(xArray[0], xArray[1], yArray[0], yArray[1], rArray[0], rArray[1], x);
                  Coordinate sum = new Coordinate(x,y);
-                                  
+                Snackbar.make(getActivity().findViewById(R.id.rl), "location: (" + sum.getFirst() +" , "+ sum.getSecond()+")", Snackbar.LENGTH_LONG).setAction("Action", null).show();
 //                 if(discovered.size()<3)
 //                     return ;
 //
@@ -263,7 +252,7 @@ public class RoomFragment extends MyFragment {
 //                         // double r1 = Utils.computeAccuracy((Beacon) discovered.get(i).first)*getRoom().getScaleFactor();
 //                         double x1 = getRoom().getXCoordinate((int)discovered.get(i).second);
 //                         double y1 = getRoom().getYCoordinate((int)discovered.get(i).second);
-//                         double r1 = getRoom().getApproximateDistance((int)discovered.get(i).second, Utils.computeAccuracy((Beacon) discovered.get(i).first))*getRoom().getScaleFactor();
+//                         double r1 = getRoom().getApproximateDistance((int)discovered.get(i).second, Utils.computeAccuracy((Beacon) discovered.get(i).first));
 //                         if(r1 < 0)
 //                             continue;
 //                         for(int j=i + 1; j< discovered.size(); j++){
@@ -272,7 +261,7 @@ public class RoomFragment extends MyFragment {
 //                             // double r2 = Utils.computeAccuracy((Beacon) discovered.get(j).first)*getRoom().getScaleFactor();
 //                             double x2 = getRoom().getXCoordinate((int)discovered.get(j).second);
 //                             double y2 = getRoom().getYCoordinate((int)discovered.get(j).second);
-//                             double r2 = getRoom().getApproximateDistance((int)discovered.get(j).second, Utils.computeAccuracy((Beacon) discovered.get(j).first))*getRoom().getScaleFactor();
+//                             double r2 = getRoom().getApproximateDistance((int)discovered.get(j).second, Utils.computeAccuracy((Beacon) discovered.get(j).first));
 //                             if(r2 < 0)
 //                                 continue;
 //                             for( int k = j + 1; k< discovered.size(); k++  ){
@@ -281,7 +270,7 @@ public class RoomFragment extends MyFragment {
 //                                 // double r3 = Utils.computeAccuracy((Beacon) discovered.get(k).first)*getRoom().getScaleFactor();
 //                                 double x3 = getRoom().getXCoordinate((int)discovered.get(k).second);
 //                                 double y3 = getRoom().getYCoordinate((int)discovered.get(k).second);
-//                                 double r3 = getRoom().getApproximateDistance((int)discovered.get(k).second, Utils.computeAccuracy((Beacon) discovered.get(k).first))*getRoom().getScaleFactor();
+//                                 double r3 = getRoom().getApproximateDistance((int)discovered.get(k).second, Utils.computeAccuracy((Beacon) discovered.get(k).first));
 //                                 if(r3 < 0)
 //                                     continue;
 //                                 double x = computeX(x1, x2, x3, y1, y2, y3, r1, r2, r3);
@@ -303,14 +292,8 @@ public class RoomFragment extends MyFragment {
 
                     if(sum.getFirst() >= min.getFirst() && sum.getFirst() <= max.getFirst() && sum.getSecond() >= min.getSecond() && sum.getSecond() <= max.getSecond()  ){
 
-                        params.leftMargin = (int)sum.getFirst();
-                        params.topMargin = (int)sum.getSecond();
-                        Snackbar.make(getActivity().findViewById(R.id.rl), "location: (" + sum.getFirst() +" , "+ sum.getSecond()+")" +
-                                        "Beacon1: "+ "(" + ((Beacon)sortedBeacons.get(0).first).getMajor() +","+ ((Beacon)sortedBeacons.get(0).first).getMinor()+")"+
-                                        "Beacon2: "+ "("+ ((Beacon)sortedBeacons.get(1).first).getMajor() +","+ ((Beacon)sortedBeacons.get(0).first).getMinor()+")"+
-                                        "Beacon3: "+ "("+ ((Beacon)sortedBeacons.get(2).first).getMajor() +","+ ((Beacon)sortedBeacons.get(0).first).getMinor()+")"
-                                , Snackbar.LENGTH_LONG)
-                                .setAction("Action", null).show();
+                        params.leftMargin = (int)(sum.getFirst() * getRoom().getScaleFactor() + getRoom().getXTranslation());
+                        params.topMargin = (int)(sum.getSecond() * getRoom().getScaleFactor() + getRoom().getYTranslation());
                         humanMarker.setLayoutParams(params);
 
                     }
