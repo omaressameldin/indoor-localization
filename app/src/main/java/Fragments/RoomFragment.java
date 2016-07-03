@@ -53,16 +53,16 @@ public class RoomFragment extends MyFragment {
         super.onCreate(savedInstanceState);
 
         //static test
-         estimoteCoordinates.add(estimoteCoordinates.size(),new Pair("27817,23519", new Coordinate(0,0)));
-         estimoteCoordinates.add(estimoteCoordinates.size(),new Pair("40516,26553", new Coordinate(0,1.6f)));
-         estimoteCoordinates.add(estimoteCoordinates.size(),new Pair("62267,24288", new Coordinate(0,4)));
-         estimoteCoordinates.add(estimoteCoordinates.size(),new Pair("53886,34857", new Coordinate(-4,4)));
-         estimoteCoordinates.add(estimoteCoordinates.size(),new Pair("11988,45406", new Coordinate(-5.6f,4)));
-         estimoteCoordinates.add(estimoteCoordinates.size(),new Pair("42969,34317", new Coordinate(-5.6f,1.6f)));
-         estimoteCoordinates.add(estimoteCoordinates.size(),new Pair("34355,23519", new Coordinate(-5.6f,0)));
+//         estimoteCoordinates.add(estimoteCoordinates.size(),new Pair("11988,45406", new Coordinate(0,0))); //4
+//         estimoteCoordinates.add(estimoteCoordinates.size(),new Pair("40516,26553", new Coordinate(0,1.6f)));
+//         estimoteCoordinates.add(estimoteCoordinates.size(),new Pair("62267,24288", new Coordinate(0,3.2f))); //6
+//         estimoteCoordinates.add(estimoteCoordinates.size(),new Pair("34355,23519", new Coordinate(-4,4)));
+//         estimoteCoordinates.add(estimoteCoordinates.size(),new Pair("53886,34857", new Coordinate(-4.8f,3.2f))); //2
+//         estimoteCoordinates.add(estimoteCoordinates.size(),new Pair("42969,34317", new Coordinate(-5.6f,1.6f)));
+//         estimoteCoordinates.add(estimoteCoordinates.size(),new Pair("27817,37349", new Coordinate(-4.8f,0))); //1
 
 
-        setRoom(new Room(estimoteCoordinates));
+//        setRoom(new Room(estimoteCoordinates));
 
 
         Coordinate pixelDimensions = getPixelDimensions(getActivity());
@@ -177,7 +177,7 @@ public class RoomFragment extends MyFragment {
         int i = 0;
         int j = 0;
         while (i < leftHalf.size() && j < rightHalf.size()){
-            if(((Beacon)leftHalf.get(i).first).getRssi() > ((Beacon)rightHalf.get(j).first).getRssi()){
+            if(getRoom().getRssi(((int)leftHalf.get(i).second), ((Beacon)leftHalf.get(i).first).getRssi()) > getRoom().getRssi(((int)rightHalf.get(j).second), ((Beacon)rightHalf.get(j).first).getRssi())){
                 sorted.add(leftHalf.get(i));
                 i++;
             }
@@ -211,8 +211,6 @@ public class RoomFragment extends MyFragment {
             public void onBeaconsDiscovered(Region region, List<Beacon> list) {
                 if(list.size() < 3)
                     return ;
-//                     Snackbar.make(getActivity().findViewById(R.id.rl), "in" , Snackbar.LENGTH_LONG)
-//                         .setAction("Action", null).show();
 
                 Log.e("fragment","room Fragment");
                 ArrayList<Pair> discovered = new ArrayList<Pair>();
@@ -226,15 +224,14 @@ public class RoomFragment extends MyFragment {
                  if(sortedBeacons.size() < 3)
                     return;
 
-                double[] xArray= new double[3];
-                double[] yArray= new double[3];
-                double[] rArray= new double[3];
-                for(int i = 0; i< 3; i ++){
+                double[] xArray= new double[sortedBeacons.size()];
+                double[] yArray= new double[sortedBeacons.size()];
+                double[] rArray= new double[sortedBeacons.size()];
+                for(int i = 0; i< sortedBeacons.size(); i ++){
                     xArray[i] = getRoom().getXCoordinate((int)sortedBeacons.get(i).second);
                     yArray[i] = getRoom().getYCoordinate((int)sortedBeacons.get(i).second);
                     rArray[i] = getRoom().getApproximateDistance((int)sortedBeacons.get(i).second, Utils.computeAccuracy((Beacon) sortedBeacons.get(i).first));
-                    Snackbar.make(getActivity().findViewById(R.id.rl), "size:" + getRoom().getDistances().getArray((int)sortedBeacons.get(i).second).size(), Snackbar.LENGTH_LONG).setAction("Action", null).show();
-                    if(rArray[i] == -1)
+                    if(rArray[i] == -1 && i < 3)
                         return;
                 }
 
@@ -291,13 +288,26 @@ public class RoomFragment extends MyFragment {
 //                     sum.setFirst((int)Math.floor(sum.getFirst()/locations.size()));
 //                     sum.setSecond((int)Math.floor(sum.getSecond()/locations.size()));
 
-                    if(sum.getFirst() >= min.getFirst() && sum.getFirst() <= max.getFirst() && sum.getSecond() >= min.getSecond() && sum.getSecond() <= max.getSecond()  ){
-
+                    if(sum.getFirst() >= (min.getFirst()) && sum.getFirst() <= (max.getFirst()) && sum.getSecond() >= (min.getSecond()) && sum.getSecond() <= (max.getSecond())  ){
                         params.leftMargin = (int)(sum.getFirst() * getRoom().getScaleFactor() + getRoom().getXTranslation());
                         params.topMargin = (int)(sum.getSecond() * getRoom().getScaleFactor() + getRoom().getYTranslation());
                         humanMarker.setLayoutParams(params);
-
                     }
+//                    else{
+//                        getRoom().getDistances().clearDistances();
+//                        getRoom().getDistances().clearStandardDeviation();
+//                    }
+//                if(sum.getFirst() <min.getFirst() )
+//                    sum.setFirst(min.getFirst());
+//                if(sum.getFirst() > max.getFirst())
+//                    sum.setFirst(max.getFirst());
+//                if(sum.getSecond() < min.getSecond())
+//                    sum.setSecond(min.getSecond());
+//                if(sum.getSecond() > max.getSecond())
+//                    sum.setSecond(max.getSecond());
+//                params.leftMargin = (int)(sum.getFirst() * getRoom().getScaleFactor() + getRoom().getXTranslation());
+//                params.topMargin = (int)(sum.getSecond() * getRoom().getScaleFactor() + getRoom().getYTranslation());
+//                humanMarker.setLayoutParams(params);
 
 
                 }

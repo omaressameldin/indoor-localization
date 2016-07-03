@@ -3,21 +3,28 @@ package Classes;
 import android.util.Pair;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 
 /**
  * Created by oessa_000 on 3/31/2016.
  */
 public class Room {
     private ArrayList<Pair> estimotescoordinates;
+    private double[] rssis;
     private Circular2DArray distances;
     private float scaleFactor ;
     private float xTranslation;
     private float yTranslation;
     public Room(ArrayList<Pair> coordinates){
         this.estimotescoordinates = coordinates;
-        distances = new Circular2DArray(coordinates.size(), 10);
+        rssis = new double[coordinates.size()];
+        Arrays.fill(rssis,99);
+        distances = new Circular2DArray(coordinates.size(), 15);
     }
 
+    public double getRssi(int index, double rssi){
+        return rssis[index] = (rssis[index] == 99)? rssi : 0.95*rssis[index] + 0.05*rssi ;
+    }
     public float getlongestDistance(){
         float longestDistance = 0;
         for(int i= 0; i< estimotescoordinates.size(); i++){
@@ -100,6 +107,7 @@ public class Room {
         distances.setStandardDeviation(index);
         distances.add(index, distance);
         return distances.getLowPassFiltered(index);
+//        return distances.getSmallest(index);
     }
 
     public ArrayList<Pair> getCoordinates(){

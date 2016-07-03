@@ -32,7 +32,7 @@ public class MainActivity extends AppCompatActivity {
         Toolbar toolbar = (Toolbar) findViewById(R.id.toolbar);
         setSupportActionBar(toolbar);
         beaconManager = new BeaconManager(getApplicationContext());
-        changeFragment(this,new RoomFragment(),"RoomFragment");
+        changeFragment(this,new InitialFragment(),"InitialFragment");
     }
 
     @Override

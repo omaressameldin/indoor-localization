@@ -24,8 +24,15 @@ public class Circular2DArray {
 
     }
 
-    public void clearStandardDeviation(int dim1){
-        standardDeviations[dim1] = -1;
+    public void clearStandardDeviation(){
+        for(int i = 0; i<standardDeviations.length; i++)
+        standardDeviations[i] = -1;
+    }
+    public void clearDistances(){
+        for(int i = 0; i<array.length; i++){
+            array[i] = new ArrayList<Double>();
+            whereToAdd[i] = 0;
+        }
     }
 
     public void add(int dim1, double value){
@@ -62,11 +69,19 @@ public class Circular2DArray {
         int prevValue = (toBeFiltered == 0)? size-1 : toBeFiltered - 1;
         Log.e("index",""+toBeFiltered);
         array[index].set(toBeFiltered,  0.95*array[index].get(prevValue) + 0.05*array[index].get(toBeFiltered));
-        if(array[index].size() < size)
-            return -1;
-        else
+//        if(array[index].size() < size)
+//            return -1;
+//        else
             return array[index].get(toBeFiltered);
+    }
 
+    public double getSmallest(int index){
+        if(array[index].size()<size)
+            return -1;
+        double smallest = array[index].get(0);
+        for(double d: array[index])
+            smallest = (d < smallest)? d : smallest;
+        return smallest;
     }
 
     public double getAvg(int index){

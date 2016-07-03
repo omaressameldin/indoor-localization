@@ -90,7 +90,7 @@ public class InitialFragment extends MyFragment implements SensorEventListener {
         temp = (TextView)getActivity().findViewById((R.id.tempview));
         instructions = (TextView) getActivity().findViewById((R.id.instructions));
 
-        degrees = new float[5];
+        degrees = new float[10];
         degreeArrayIndex = 0;
         direction = new ArrayList();
 
@@ -150,7 +150,7 @@ public class InitialFragment extends MyFragment implements SensorEventListener {
                     nextInstruction("Now put the phone on top of the beacon and press the 'Calibrate' button");
                 }
                 else{
-                    addCoordinate((float) stepCount * 0.8f);
+                    addCoordinate((float) stepCount * 0.76f);
                     countToggle.performClick();
                     Snackbar.make(view, "stepCount: " + stepCount + " steps", Snackbar.LENGTH_LONG)
                             .setAction("Action", null).show();
@@ -217,8 +217,8 @@ public class InitialFragment extends MyFragment implements SensorEventListener {
                     ignore = (countdown < 0)? false : ignore;
                 }
                 else
-                    countdown = 22;
-                if(toggleState == 1 && (Math.abs(prevY - gravity[1]) > 0.6) && !ignore){
+                    countdown = 15;
+                if(toggleState == 1 && (Math.abs(prevY - gravity[1]) > 0.8) && !ignore){
                     stepCount++;
                     steps.setText("Step Count: " + stepCount);
                     ignore = true;
@@ -257,9 +257,11 @@ public class InitialFragment extends MyFragment implements SensorEventListener {
             }
             degrees[degreeArrayIndex] = Math.round(angle);
             degreeArrayIndex++;
-            if (degreeArrayIndex == 5)
+            if (degreeArrayIndex == 10)
                 direction.add(direction.size(),getDirection());
-            compassData.setText("Degree: "+ Math.round(angle)+"\nDirection: "+ direction);
+//            compassData.setText("Degree: "+ Math.round(angle)+"\nDirection: "+ direction);
+            compassData.setText("Degree: "+ Math.round(angle));
+
         }
 
 
@@ -287,15 +289,15 @@ public class InitialFragment extends MyFragment implements SensorEventListener {
         for(int i =0; i < degrees.length; i++){
             meanDegree += degrees[i];
         }
-        meanDegree /=5 ;
+        meanDegree /=degrees.length ;
         degreeArrayIndex = 0 ;
-        if( (meanDegree >= 315 && meanDegree <=360) ||( meanDegree >= 0 && meanDegree <= 45))
+        if( (meanDegree >= 315 && meanDegree <=360) ||( meanDegree >= 0 && meanDegree < 45))
             return 1;//forward
-        else if(meanDegree >= 135 && meanDegree <= 225)
+        else if(meanDegree >= 135 && meanDegree < 225)
             return 2;//backward
-        else if(meanDegree >= 225 && meanDegree <= 315)
+        else if(meanDegree >= 225 && meanDegree < 315)
             return 3;//left
-        else if(meanDegree >= 45 && meanDegree <= 135)
+        else if(meanDegree >= 45 && meanDegree < 135)
             return 4;//right
 
         return 0;
@@ -318,31 +320,40 @@ public class InitialFragment extends MyFragment implements SensorEventListener {
                     break;
             }
         Pair addedPair;
+
             addedPair = new Pair(nearestBeacon, newCoordinate);
         temp.setText(temp.getText()+"\n New Pair: "+ "("+(String)addedPair.first+","+
                 ((Coordinate)addedPair.second).getFirst()+","+
-                ((Coordinate)addedPair.second).getSecond()+")");
+                ((Coordinate)addedPair.second).getSecond()+")direction:"+avgDirection);
         Log.e("AVGDIRECTION", avgDirection+"");
         estimoteCoordinates.add(estimoteCoordinates.size(),addedPair);
 
     }
 
-    protected int calculateDirection(){
+    protected int calculateDirection() {
         int count1s = 0;
         int count2s = 0;
         int count3s = 0;
         int count4s = 0;
-        for(int d : direction){
-            switch(d){
-                case 1: count1s ++; break;
-                case 2: count2s ++; break;
-                case 3: count3s ++; break;
-                case 4: count4s ++; break;
+        for (int d : direction) {
+            switch (d) {
+                case 1:
+                    count1s++;
+                    break;
+                case 2:
+                    count2s++;
+                    break;
+                case 3:
+                    count3s++;
+                    break;
+                case 4:
+                    count4s++;
+                    break;
             }
         }
         direction.clear();
-        return (count1s > count2s)? ((count1s > count3s)? ((count1s > count4s)? 1 : 4 ) : ((count3s > count4s)? 3 : 4) ) :
-                ((count2s > count3s)? ((count2s > count4s)? 2 : 4 ) : ((count3s > count4s)? 3 : 4) ) ;
+        int max= Math.max(count1s, Math.max(count2s, Math.max(count3s, count4s)));
+        return (max == count1s)? 1 : ((max == count2s)? 2 : ((max == count3s)? 3 : 4));
     }
 
     protected void nextInstruction(String instruction){
