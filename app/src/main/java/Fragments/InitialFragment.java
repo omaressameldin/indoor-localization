@@ -1,7 +1,6 @@
 package Fragments;
 
 import android.content.Context;
-import android.hardware.GeomagneticField;
 import android.hardware.Sensor;
 import android.hardware.SensorEvent;
 import android.hardware.SensorEventListener;
@@ -9,8 +8,6 @@ import android.hardware.SensorManager;
 import android.os.Bundle;
 import android.support.design.widget.FloatingActionButton;
 import android.support.design.widget.Snackbar;
-import android.util.Log;
-import android.util.Pair;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -29,6 +26,7 @@ import java.util.UUID;
 import Classes.Coordinate;
 import Classes.MyFragment;
 import Classes.Room;
+import Classes.RoomEstimote;
 
 import static com.example.oessa_000.countsteps.MainActivity.changeFragment;
 import static com.example.oessa_000.countsteps.MainActivity.getBeaconManager;
@@ -38,132 +36,99 @@ import static com.example.oessa_000.countsteps.MainActivity.setRoom;
  * Created by oessa_000 on 3/31/2016.
  */
 public class InitialFragment extends MyFragment implements SensorEventListener {
-    private int toggleState = 2;
+
+    /* Step Counter Variables */
     private int stepCount = 0;
     private double prevY;
-    private double prevZ;
-    private boolean ignore;
-    private int countdown;
-    private ArrayList<Pair> estimoteCoordinates = new ArrayList<Pair>();
+    private boolean ignoreGravityIncrease;
+    private int waitingCountDown;
 
+    /* What's going on Variable */
+    private int state = 2;
+
+    /*Room Variables */
+    private ArrayList<RoomEstimote> estimoteRoomCoordinates = new ArrayList<RoomEstimote>();
+    private String nearestBeacon;
+    private int[] nearestBeaconRSSIs = new int[10];
+    int nearestBeaconRSSIsArrayIndex = 0;
+    int baseRSSI = 0;
+
+    /* Sensors Variables */
     private SensorManager mSensorManager;
     private Sensor mSensorGravity;
-    private Sensor mSensorMagnetic;
+    private Sensor mSensorGyroscope;
 
-    private ToggleButton countToggle ;
+    /* Buttons Variables */
+    private ToggleButton stateToggle ;
+    private FloatingActionButton undoButton;
+    private FloatingActionButton doneButton;
 
-    private float[] degrees;
-    private int degreeArrayIndex;
-    private ArrayList<Integer> direction;
-    private String nearestBeacon;
-    private float[] gravity = new float[3];
-    // magnetic data
-    private float[] geomagnetic = new float[3];
-    // Rotation data
-    private float[] rotation = new float[9];
-    // orientation (azimuth, pitch, roll)
-    private float[] orientation = new float[3];
-    // smoothed values
-    private float[] smoothed = new float[3];
-    private double angle = 0;
-    private GeomagneticField geomagneticField;
+    /* Walking Direction Variables */
+    private int walkingDirection = 1 ; /* 1 --> forward, 2 --> backward, 3 --> left, 4 --> right */
+    private boolean turningNow;
 
-    private TextView degree;
-    private TextView steps;
-    private FloatingActionButton undo;
-    private FloatingActionButton done;
-    private TextView compassData;
-    private TextView temp;
-    private TextView instructions;
+    /* Views Variables */
+    private TextView stepsView;
+    private TextView walkingDirectionView;
+    private TextView tempView;
+    private TextView instructionsView;
+
 
     public InitialFragment(){}
 
+
     public void onActivityCreated(Bundle savedInstanceState){
         super.onCreate(savedInstanceState);
-
-
-        countToggle = (ToggleButton) getActivity().findViewById(R.id.countToggle);
-        steps = (TextView) getActivity().findViewById((R.id.stepView));
-        undo = (FloatingActionButton) getActivity().findViewById(R.id.undo);
-        done = (FloatingActionButton) getActivity().findViewById(R.id.done);
-        compassData = (TextView) getActivity().findViewById((R.id.compassData));
-        temp = (TextView)getActivity().findViewById((R.id.tempview));
-        instructions = (TextView) getActivity().findViewById((R.id.instructions));
-
-        degrees = new float[10];
-        degreeArrayIndex = 0;
-        direction = new ArrayList();
-
+        /* Initialize Buttons */
+        stateToggle = (ToggleButton) getActivity().findViewById(R.id.state);
+        undoButton = (FloatingActionButton) getActivity().findViewById(R.id.undo);
+        doneButton = (FloatingActionButton) getActivity().findViewById(R.id.done);
+        /*Initialize Views */
+        stepsView = (TextView) getActivity().findViewById((R.id.stepView));
+        walkingDirectionView = (TextView) getActivity().findViewById((R.id.walkingDirection));
+        tempView = (TextView)getActivity().findViewById((R.id.tempview));
+        instructionsView = (TextView) getActivity().findViewById((R.id.instructions));
+        /* Button Actions */
         buttonsActions();
     }
 
-    public void connectBeaconManager(){
-        getBeaconManager().connect(new BeaconManager.ServiceReadyCallback() {
-            @Override
-            public void onServiceReady() {
-                getBeaconManager().startRanging(new Region(
-                        "monitored region",
-                        UUID.fromString("B9407F30-F5F8-466E-AFF9-25556B57FE6D"),
-                        null, null));
-            }
-        });
-        getBeaconManager().setRangingListener(new BeaconManager.RangingListener() {
-            public void onBeaconsDiscovered(Region region, List<Beacon> list) {
-                if(list.size() == 0)
-                    return ;
-                String nearestBeaconID = list.get(0).getMajor() + "," + list.get(0).getMinor();
-                double strongestRssi = list.get(0).getRssi();
-                Log.e("fragment","initial Fragment");
-                for (Beacon b : list) {
-                    double rssi = b.getRssi();
-                    if (rssi > strongestRssi) {
-                        strongestRssi = rssi;
-                        nearestBeaconID = b.getMajor() + "," + b.getMinor();
-                    }
-                }
-                nearestBeacon = nearestBeaconID;
-            }
-
-        });
-    }
 
     public void buttonsActions(){
-        countToggle.setOnClickListener(new View.OnClickListener() {
-            @Override
+        /* State Toggle Action */
+        stateToggle.setOnClickListener(new View.OnClickListener() {
             public void onClick(View view) {
-                toggleState = (toggleState == 3)? 0 : toggleState + 1;
-                if (toggleState == 0) {
-                    countToggle.setText("I am Walking ");
+                state = (state == 3)? 0 : state + 1;
+                if (state == 0) {
+                    stateToggle.setText("I am Walking ");
                     nextInstruction("now start walking  then press the 'I am walking button' or " +
                             "press the green button and your room will magically appear :) ");
 
-                } else if(toggleState == 1) {
-                    countToggle.setText("Stop Walking");
+                } else if(state == 1) {
+                    stateToggle.setText("Stop Walking");
                     stepCount = 0;
-                    countdown = 5;
-                    ignore = true;
-                    steps.setText("Step Count: " + stepCount);
+                    waitingCountDown = 2;
+                    ignoreGravityIncrease = false;
+                    stepsView.setText("Step Count: " + stepCount);
                     nextInstruction("Press the 'Stop Walking' button when you stop walking");
                 }
-                else  if(toggleState == 2){
-                    countToggle.setText("Calibrate");
+                else  if(state == 2){
+                    stateToggle.setText("Calibrate");
                     nextInstruction("Now put the phone on top of the beacon and press the 'Calibrate' button");
                 }
                 else{
-                    addCoordinate((float) stepCount * 0.76f);
-                    countToggle.performClick();
+                    nextInstruction("Please keep the phoen on the beacon while the calibration process is in progress....");
                     Snackbar.make(view, "stepCount: " + stepCount + " steps", Snackbar.LENGTH_LONG)
                             .setAction("Action", null).show();
                 }
             }
         });
-
-        done .setOnClickListener(new View.OnClickListener() {
+        /* Done Button Action */
+        doneButton .setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-                if (toggleState !=2) {
-                    if (estimoteCoordinates.size() > 3) {
-                        setRoom(new Room(estimoteCoordinates));
+                if (state !=2) {
+                    if (estimoteRoomCoordinates.size() > 3) {
+                        setRoom(new Room(estimoteRoomCoordinates));
                         changeFragment(getActivity(), new RoomFragment(),"roomFragment");
                     } else {
                         Snackbar.make(view, "There is no room with only 2 walls :(", Snackbar.LENGTH_LONG)
@@ -175,13 +140,13 @@ public class InitialFragment extends MyFragment implements SensorEventListener {
                 }
             }
         });
-
-        undo.setOnClickListener(new View.OnClickListener() {
+        /* Undo Button Action */
+        undoButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-                if (toggleState !=2) {
-                    if (estimoteCoordinates.size() > 1) {
-                        estimoteCoordinates.remove(estimoteCoordinates.size() - 1);
+                if (state !=2) {
+                    if (estimoteRoomCoordinates.size() > 1) {
+                        estimoteRoomCoordinates.remove(estimoteRoomCoordinates.size() - 1);
                         Snackbar.make(view, "Wall removed", Snackbar.LENGTH_LONG)
                                 .setAction("Action", null).show();
                     } else {
@@ -196,170 +161,210 @@ public class InitialFragment extends MyFragment implements SensorEventListener {
         });
     }
 
+
+    public void connectBeaconManager(){
+        /* Start Communication with Estimote Beacons */
+        getBeaconManager().connect(new BeaconManager.ServiceReadyCallback() {
+            @Override
+            public void onServiceReady() {
+                getBeaconManager().startRanging(new Region(
+                        "monitored region",
+                        UUID.fromString("B9407F30-F5F8-466E-AFF9-25556B57FE6D"),
+                        null, null));
+            }
+        });
+        /* Search For Estimote Beacons */
+        getBeaconManager().setRangingListener(new BeaconManager.RangingListener() {
+            public void onBeaconsDiscovered(Region region, List<Beacon> list) {
+                /* no beacons found or phone is not on top of a beacon */
+                if(list.size() == 0 || state != 3)
+                    return ;
+                /* Get Nearest Beacon From Strongest RSSI */
+                String nearestBeaconID = list.get(0).getMacAddress().toString();
+                int strongestRssi = list.get(0).getRssi();
+                for (Beacon b : list) {
+                    int rssi = b.getRssi();
+                    if (rssi > strongestRssi) {
+                        strongestRssi = rssi;
+                        nearestBeaconID = list.get(0).getMacAddress().toString();;
+                    }
+                }
+                nearestBeacon = nearestBeaconID;
+                /* when the nearest beacon changes a person must have moved so this is a new side, reset everything */
+                nearestBeaconRSSIsArrayIndex = (nearestBeacon != nearestBeaconID)? 0 : nearestBeaconRSSIsArrayIndex;
+                nearestBeaconRSSIs[nearestBeaconRSSIsArrayIndex++] = strongestRssi;
+                /* got 20 values then let's calculate RSSI value */
+                if(nearestBeaconRSSIsArrayIndex == 10){
+                    nearestBeaconRSSIsArrayIndex = 0;
+                    baseRSSI = getBaseRSSI();
+                    addCoordinate((float) stepCount * 0.76f);
+                    stateToggle.performClick();
+                }
+            }
+        });
+    }
+
+    public int getBaseRSSI(){
+        /* get average of RSSI values */
+        double avg = 0.0;
+        for(int i = 0; i < nearestBeaconRSSIs.length; i++){
+            avg += nearestBeaconRSSIs[i];
+        }
+        avg = avg/nearestBeaconRSSIs.length ;
+        /* get standard deviation of the RSSI values */
+        double standardDeviation = 0;
+        for(int i = 0; i<nearestBeaconRSSIs.length; i++){
+            standardDeviation += Math.pow((nearestBeaconRSSIs[i] - avg), 2);
+        }
+        standardDeviation = Math.sqrt(standardDeviation / nearestBeaconRSSIs.length) ;
+        /* exclude rssi values that are higher than the standard deviation */
+        ArrayList<Integer> resultsArrayList = new ArrayList<Integer>();
+        for(int i = 0, j = 0; i<nearestBeaconRSSIs.length; i++){
+            if(Math.abs(nearestBeaconRSSIs[i] - avg) < standardDeviation  ){
+                resultsArrayList.add(nearestBeaconRSSIs[i]);
+            }
+        }
+        /* apply a low pass vilter to the non excluded values */
+        double[] resultsArray = new double[resultsArrayList.size()];
+        resultsArray[0] = resultsArrayList.get(0);
+        for( int i=1; i<resultsArrayList.size(); i++){
+            resultsArray[i] = 0.95*resultsArray[i - 1] + 0.05 * resultsArrayList.get(i);
+        }
+
+         avg = 0.0;
+        for(int i = 0; i < resultsArray.length; i++){
+            avg += resultsArray[i];
+        }
+        return (int)Math.floor(avg/resultsArray.length);
+    }
+
+
     public View onCreateView(LayoutInflater inflater, ViewGroup container,
                              Bundle savedInstanceState) {
-        // Inflate the layout for this fragment
+        /* Inflate the layout for this fragment */
         return inflater.inflate(R.layout.initial_view, container, false);
     }
 
-    @Override
+
     public void onSensorChanged(SensorEvent event) {
-        boolean accelOrMagnetic = false;
         Sensor sensor = event.sensor;
         switch(sensor.getType()){
-            case Sensor.TYPE_ACCELEROMETER:
-                smoothed = lowPassFilter(event.values, gravity);
-                gravity[0] = smoothed[0];
-                gravity[1] = smoothed[1];
-                gravity[2] = smoothed[2];
-                if(ignore) {
-                    countdown--;
-                    ignore = (countdown < 0)? false : ignore;
+            /* Gravity Sensor For Walking and Step Count */
+            case Sensor.TYPE_GRAVITY:
+                if(state == 1){
+                    if(ignoreGravityIncrease){
+                        waitingCountDown --;
+                        ignoreGravityIncrease = (waitingCountDown <= 0)? false : true;
+                    }
+                    if( ((int)prevY - (int) event.values[1]) >= 1 &&  (prevY - event.values[1]) >= 0.5 &&!ignoreGravityIncrease){
+                        stepCount++;
+                        stepsView.setText("Step Count: " + stepCount);
+                        waitingCountDown = 2;
+                        ignoreGravityIncrease = true;
+                    }
                 }
-                else
-                    countdown = 15;
-                if(toggleState == 1 && (Math.abs(prevY - gravity[1]) > 0.8) && !ignore){
-                    stepCount++;
-                    steps.setText("Step Count: " + stepCount);
-                    ignore = true;
-                }
-                prevY = gravity[1];
-                accelOrMagnetic = true;
+                prevY = event.values[1];
                 break;
+            /* Gyroscope For Getting The Walking Direction */
+            case Sensor.TYPE_GYROSCOPE:
+                if(state == 0){
+                    if(turningNow){
+                        if(Math.abs(event.values[2]) < 0.3){
+                            turningNow = false;
 
-            case Sensor.TYPE_MAGNETIC_FIELD:
-                smoothed = lowPassFilter(event.values, geomagnetic);
-                geomagnetic[0] = smoothed[0];
-                geomagnetic[1] = smoothed[1];
-                geomagnetic[2] = smoothed[2];
-                accelOrMagnetic = true;
+                        }
+                    }
+                        /*
+                     forward + right = right
+                     backward + right = left
+                     left + right = forward
+                     right + right = backward
+                      */
+                    if(!turningNow) {
+                        if(event.values[2] < -1  ) {
+                            turningNow = true;
+                            if(walkingDirection == 1) {
+                                walkingDirection = 4;
+                                walkingDirectionView.setText("Direction: Right");
+                            }
+                            else if(walkingDirection == 2) {
+                                walkingDirection = 3;
+                                walkingDirectionView.setText("Direction: Left");
+                            }
+                            else if(walkingDirection == 3) {
+                                walkingDirection = 1;
+                                walkingDirectionView.setText("Direction: Forward");
+                            }
+                            else if(walkingDirection == 4) {
+                                walkingDirection = 2;
+                                walkingDirectionView.setText("Direction: Backward");
+                            }
+                        }
+                        /*
+                     forward + left = left
+                     backward + left = right
+                     left + left = backward
+                     right + left = forward
+                      */
+                        if(event.values[2] > 1) {
+                            turningNow = true;
+                            if(walkingDirection == 1) {
+                                walkingDirection = 3;
+                                walkingDirectionView.setText("Direction: Left");
+                            }
+                            else if(walkingDirection == 2) {
+                                walkingDirection = 4;
+                                walkingDirectionView.setText("Direction: Right");
+                            }
+                            else if(walkingDirection == 3) {
+                                walkingDirection = 2;
+                                walkingDirectionView.setText("Direction: Backward");
+                            }
+                            else if(walkingDirection == 4) {
+                                walkingDirection = 1;
+                                walkingDirectionView.setText("Direction: Forward");
+                            }
+                        }
+                    }
+                }
                 break;
         }
-
-        if(accelOrMagnetic && toggleState == 1 ){
-            // get rotation matrix to get gravity and magnetic data
-            SensorManager.getRotationMatrix(rotation, null, gravity, geomagnetic);
-            // get angle to target
-            SensorManager.getOrientation(rotation, orientation);
-            // east degrees of true North
-            angle = orientation[0];
-            // convert from radians to degrees
-            angle = Math.toDegrees(angle);
-
-            // fix difference between true North and magnetical North
-            if (geomagneticField != null) {
-                angle += geomagneticField.getDeclination();
-            }
-
-            // angle must be in 0-360
-            if (angle < 0) {
-                angle += 360.0;
-            }
-            degrees[degreeArrayIndex] = Math.round(angle);
-            degreeArrayIndex++;
-            if (degreeArrayIndex == 10)
-                direction.add(direction.size(),getDirection());
-//            compassData.setText("Degree: "+ Math.round(angle)+"\nDirection: "+ direction);
-            compassData.setText("Degree: "+ Math.round(angle));
-
-        }
-
-
     }
 
-    @Override
+
     public void onAccuracyChanged(Sensor sensor, int accuracy) {
 
     }
 
-    protected float[] lowPassFilter( float[] input, float[] output ) {
-        if ( output == null ) return input;
-        for ( int i=0; i<input.length; i++ ) {
-            output[i] = output[i] + 1.0f * (input[i] - output[i]);
-        }
-        return output;
-    }
-
-
-
-
-
-    protected int getDirection(){
-        float meanDegree = 0f;
-        for(int i =0; i < degrees.length; i++){
-            meanDegree += degrees[i];
-        }
-        meanDegree /=degrees.length ;
-        degreeArrayIndex = 0 ;
-        if( (meanDegree >= 315 && meanDegree <=360) ||( meanDegree >= 0 && meanDegree < 45))
-            return 1;//forward
-        else if(meanDegree >= 135 && meanDegree < 225)
-            return 2;//backward
-        else if(meanDegree >= 225 && meanDegree < 315)
-            return 3;//left
-        else if(meanDegree >= 45 && meanDegree < 135)
-            return 4;//right
-
-        return 0;
-    }
 
     protected void addCoordinate(float distance){
-        Coordinate newCoordinate =(estimoteCoordinates.size()>0)? new Coordinate(((Coordinate)estimoteCoordinates.get(estimoteCoordinates.size()-1).second).getFirst(),((Coordinate)estimoteCoordinates.get(estimoteCoordinates.size()-1).second).getSecond())
+        /* Get Previous Coordinate */
+        Coordinate newCoordinate =(estimoteRoomCoordinates.size()>0)? new Coordinate(((Coordinate)estimoteRoomCoordinates.get(estimoteRoomCoordinates.size()-1).getLocation()).getFirst(),((Coordinate)estimoteRoomCoordinates.get(estimoteRoomCoordinates.size()-1).getLocation()).getSecond())
                                     : new Coordinate(0,0);
-        degreeArrayIndex = 0;
-        nextInstruction("please stand still for a second now");
-        int avgDirection = (estimoteCoordinates.size()>0)? calculateDirection() : 0;
-            switch(avgDirection){
-                case 1: newCoordinate.setFirst(newCoordinate.getFirst() + distance);
-                    break;
-                case 2: newCoordinate.setFirst(newCoordinate.getFirst() - distance);
-                    break;
-                case 3: newCoordinate.setSecond(newCoordinate.getSecond() - distance);
-                    break;
-                case 4: newCoordinate.setSecond(newCoordinate.getSecond() + distance);
-                    break;
-            }
-        Pair addedPair;
-
-            addedPair = new Pair(nearestBeacon, newCoordinate);
-        temp.setText(temp.getText()+"\n New Pair: "+ "("+(String)addedPair.first+","+
-                ((Coordinate)addedPair.second).getFirst()+","+
-                ((Coordinate)addedPair.second).getSecond()+")direction:"+avgDirection);
-        Log.e("AVGDIRECTION", avgDirection+"");
-        estimoteCoordinates.add(estimoteCoordinates.size(),addedPair);
-
-    }
-
-    protected int calculateDirection() {
-        int count1s = 0;
-        int count2s = 0;
-        int count3s = 0;
-        int count4s = 0;
-        for (int d : direction) {
-            switch (d) {
-                case 1:
-                    count1s++;
-                    break;
-                case 2:
-                    count2s++;
-                    break;
-                case 3:
-                    count3s++;
-                    break;
-                case 4:
-                    count4s++;
-                    break;
-            }
+        /* Edit new Coordinate According to Walking Direction  */
+        switch(walkingDirection){
+            case 1: newCoordinate.setSecond(newCoordinate.getSecond() + distance);
+                break;
+            case 2: newCoordinate.setSecond(newCoordinate.getSecond() - distance);
+                break;
+            case 3: newCoordinate.setFirst(newCoordinate.getFirst() + distance);
+                break;
+            case 4: newCoordinate.setFirst(newCoordinate.getFirst() - distance);
+                break;
         }
-        direction.clear();
-        int max= Math.max(count1s, Math.max(count2s, Math.max(count3s, count4s)));
-        return (max == count1s)? 1 : ((max == count2s)? 2 : ((max == count3s)? 3 : 4));
+        RoomEstimote addedEstimote;
+            addedEstimote = new RoomEstimote(nearestBeacon, baseRSSI, newCoordinate);
+        tempView.setText(tempView.getText()+"\n New Pair: "+ "("+(String)addedEstimote.getBeaconID()+","+
+                ((Coordinate)addedEstimote.getLocation()).getFirst()+","+
+                ((Coordinate)addedEstimote.getLocation()).getSecond()+")");
+        estimoteRoomCoordinates.add(estimoteRoomCoordinates.size(),addedEstimote);
     }
+
 
     protected void nextInstruction(String instruction){
-        instructions.setText(instruction);
+        /* Change The Instruction Displayed */
+        instructionsView.setText(instruction);
     }
-
 
 
     public void onStart() {
@@ -369,22 +374,22 @@ public class InitialFragment extends MyFragment implements SensorEventListener {
 
     public void onResume() {
         super.onResume();
+        /* Initialize Sensors */
         mSensorManager = (SensorManager) getActivity().getSystemService(Context.SENSOR_SERVICE);
-        mSensorGravity = mSensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER);
-        mSensorMagnetic = mSensorManager.getDefaultSensor(Sensor.TYPE_MAGNETIC_FIELD);
+        mSensorGravity = mSensorManager.getDefaultSensor(Sensor.TYPE_GRAVITY);
+        mSensorGyroscope = mSensorManager.getDefaultSensor(Sensor.TYPE_GYROSCOPE);
 
-        // listen to these sensors
+        /* Set Sensors Delay */
         mSensorManager.registerListener(this, mSensorGravity,
                 SensorManager.SENSOR_DELAY_NORMAL);
-        mSensorManager.registerListener(this, mSensorMagnetic,
+        mSensorManager.registerListener(this, mSensorGyroscope,
                 SensorManager.SENSOR_DELAY_NORMAL);
-
     }
 
     public void onStop(){
         super.onStop();
         mSensorManager.unregisterListener(this, mSensorGravity);
-        mSensorManager.unregisterListener(this, mSensorMagnetic);
+        mSensorManager.unregisterListener(this, mSensorGyroscope);
     }
 
 }

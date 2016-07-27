@@ -29,6 +29,7 @@ import java.util.UUID;
 import Classes.Coordinate;
 import Classes.MyFragment;
 import Classes.Room;
+import Classes.RoomEstimote;
 
 import static com.example.oessa_000.countsteps.MainActivity.getBeaconManager;
 import static com.example.oessa_000.countsteps.MainActivity.getRoom;
@@ -42,28 +43,17 @@ public class RoomFragment extends MyFragment {
 
     int beaconDetectedCount = 0;
     private Canvas canvas;
-    ImageView drawingImageView;
-    ImageView humanMarker;
-    Coordinate min;
-    Coordinate max;
-    RelativeLayout.LayoutParams params ;
+    private ImageView drawingImageView;
+    private ImageView humanMarker;
+    private Coordinate min;
+    private Coordinate max;
+    private RelativeLayout.LayoutParams params ;
     private ArrayList<Pair> estimoteCoordinates = new ArrayList<Pair>();
+    private int stepCount;
+    private int directionWalked;
 
     public void onActivityCreated(Bundle savedInstanceState){
         super.onCreate(savedInstanceState);
-
-        //static test
-//         estimoteCoordinates.add(estimoteCoordinates.size(),new Pair("11988,45406", new Coordinate(0,0))); //4
-//         estimoteCoordinates.add(estimoteCoordinates.size(),new Pair("40516,26553", new Coordinate(0,1.6f)));
-//         estimoteCoordinates.add(estimoteCoordinates.size(),new Pair("62267,24288", new Coordinate(0,3.2f))); //6
-//         estimoteCoordinates.add(estimoteCoordinates.size(),new Pair("34355,23519", new Coordinate(-4,4)));
-//         estimoteCoordinates.add(estimoteCoordinates.size(),new Pair("53886,34857", new Coordinate(-4.8f,3.2f))); //2
-//         estimoteCoordinates.add(estimoteCoordinates.size(),new Pair("42969,34317", new Coordinate(-5.6f,1.6f)));
-//         estimoteCoordinates.add(estimoteCoordinates.size(),new Pair("27817,37349", new Coordinate(-4.8f,0))); //1
-
-
-//        setRoom(new Room(estimoteCoordinates));
-
 
         Coordinate pixelDimensions = getPixelDimensions(getActivity());
 
@@ -92,14 +82,10 @@ public class RoomFragment extends MyFragment {
         drawRoom(paint);
         min = getRoom().getMinValueOfCoordinates();
         max = getRoom().getMaxValueOfCoordinates();
-        Log.e("min", "("+min.getFirst()+","+min.getSecond()+")");
-        Log.e("max", "("+max.getFirst()+","+max.getSecond()+")");
         String coordinatesString = "";
-        for(int i = 0; i < getRoom().getCoordinates().size(); i++){
-            coordinatesString += ((Coordinate)getRoom().getCoordinates().get(i).second).getFirst() + "," + ((Coordinate)getRoom().getCoordinates().get(i).second).getSecond() + "\n";
+        for(int i = 0; i < getRoom().getCoordinates().length; i++){
+            coordinatesString += ((Coordinate)getRoom().getCoordinates()[i].getLocation()).getFirst() + "," + ((Coordinate)getRoom().getCoordinates()[i].getLocation()).getSecond() + "\n";
         }
-        Log.e("All Coordinates",coordinatesString);
-
     }
 
     public View onCreateView(LayoutInflater inflater, ViewGroup container,
@@ -125,7 +111,7 @@ public class RoomFragment extends MyFragment {
 
     public void drawRoom( Paint paint){
 //        canvas.translate(getRoom().getXTranslation(),getRoom().getYTranslation());
-        ArrayList<Pair> coordinates = getRoom().getCoordinates();
+        RoomEstimote[] coordinates = getRoom().getCoordinates();
         // Coordinate startPoint = (coordinates.size() > 0)? (Coordinate)coordinates.get(0).second : new Coordinate(0,0) ;
         // for(int i = 1; i < coordinates.size(); i++){
         //     ((Coordinate)coordinates.get(i).second).setFirst(((Coordinate)coordinates.get(i).second).getFirst() * getRoom().getScaleFactor() + getRoom().getXTranslation());
@@ -136,12 +122,12 @@ public class RoomFragment extends MyFragment {
         // canvas.drawLine(startPoint.getFirst(),startPoint.getSecond(),((Coordinate)coordinates.get(0).second).getFirst(),((Coordinate)coordinates.get(0).second).getSecond(),paint);
 
 
-         Coordinate startPoint =  new Coordinate(((Coordinate)coordinates.get(0).second).getFirst() * getRoom().getScaleFactor() + getRoom().getXTranslation(),
-                 ((Coordinate)coordinates.get(0).second).getSecond() * getRoom().getScaleFactor() + getRoom().getYTranslation());
+         Coordinate startPoint =  new Coordinate((coordinates[0].getLocation()).getFirst() * getRoom().getScaleFactor() + getRoom().getXTranslation(),
+                 (coordinates[0].getLocation()).getSecond() * getRoom().getScaleFactor() + getRoom().getYTranslation());
         Coordinate endPoint;
-        for(int i = 1; i < coordinates.size(); i++){
-            endPoint = new Coordinate(((Coordinate)coordinates.get(i).second).getFirst() * getRoom().getScaleFactor() + getRoom().getXTranslation(),
-                    ((Coordinate)coordinates.get(i).second).getSecond() * getRoom().getScaleFactor() + getRoom().getYTranslation());
+        for(int i = 1; i < coordinates.length; i++){
+            endPoint = new Coordinate((coordinates[i].getLocation()).getFirst() * getRoom().getScaleFactor() + getRoom().getXTranslation(),
+                    (coordinates[i].getLocation()).getSecond() * getRoom().getScaleFactor() + getRoom().getYTranslation());
             canvas.drawLine(startPoint.getFirst(), startPoint.getSecond(), endPoint.getFirst(), endPoint.getSecond(), paint);
             startPoint =endPoint;
             if(i == 1)
@@ -157,8 +143,8 @@ public class RoomFragment extends MyFragment {
             if(i == 6)
                 paint.setColor(Color.CYAN);
         }
-         endPoint = new Coordinate(((Coordinate)coordinates.get(0).second).getFirst() * getRoom().getScaleFactor() + getRoom().getXTranslation(),
-                 ((Coordinate)coordinates.get(0).second).getSecond() * getRoom().getScaleFactor() + getRoom().getYTranslation());
+         endPoint = new Coordinate((coordinates[0].getLocation()).getFirst() * getRoom().getScaleFactor() + getRoom().getXTranslation(),
+                 (coordinates[0].getLocation()).getSecond() * getRoom().getScaleFactor() + getRoom().getYTranslation());
         canvas.drawLine(startPoint.getFirst(),startPoint.getSecond(),endPoint.getFirst(),endPoint.getSecond(),paint);
     }
 
@@ -177,7 +163,7 @@ public class RoomFragment extends MyFragment {
         int i = 0;
         int j = 0;
         while (i < leftHalf.size() && j < rightHalf.size()){
-            if(getRoom().getRssi(((int)leftHalf.get(i).second), ((Beacon)leftHalf.get(i).first).getRssi()) > getRoom().getRssi(((int)rightHalf.get(j).second), ((Beacon)rightHalf.get(j).first).getRssi())){
+            if(getRoom().getRSSI(((int)leftHalf.get(i).second)) > getRoom().getRSSI(((int)rightHalf.get(j).second))){
                 sorted.add(leftHalf.get(i));
                 i++;
             }
@@ -212,33 +198,48 @@ public class RoomFragment extends MyFragment {
                 if(list.size() < 3)
                     return ;
 
-                Log.e("fragment","room Fragment");
                 ArrayList<Pair> discovered = new ArrayList<Pair>();
+                Log.e("RoomEstimotes Size", getRoom().getCoordinates().length+"");
                 for(Beacon b : list){
-                    int index = getRoom().findBeacon(b.getMajor()+","+b.getMinor());
-                    if(index != -1)
-                        discovered.add(new Pair(b,index));
+                    int index = getRoom().findBeacon(b.getMacAddress().toString());
+                    if(index != -1 && getRoom().addRSSI(index, b.getRssi())) {
+                        discovered.add(new Pair(b, index));
+                    }
                 }
-
-                 ArrayList<Pair> sortedBeacons = mergeSortBeacons(discovered,0,discovered.size() -1);
+                if(discovered.size() < 3)
+                    return;
+                ArrayList<Pair> sortedBeacons = mergeSortBeacons(discovered,0,discovered.size() -1);
                  if(sortedBeacons.size() < 3)
                     return;
 
                 double[] xArray= new double[sortedBeacons.size()];
                 double[] yArray= new double[sortedBeacons.size()];
                 double[] rArray= new double[sortedBeacons.size()];
-                for(int i = 0; i< sortedBeacons.size(); i ++){
+                Coordinate sum = null;
+                for(int i = 0; i< 3; i ++){
+
                     xArray[i] = getRoom().getXCoordinate((int)sortedBeacons.get(i).second);
                     yArray[i] = getRoom().getYCoordinate((int)sortedBeacons.get(i).second);
-                    rArray[i] = getRoom().getApproximateDistance((int)sortedBeacons.get(i).second, Utils.computeAccuracy((Beacon) sortedBeacons.get(i).first));
-                    if(rArray[i] == -1 && i < 3)
+                    rArray[i] = getRoom().getApproximateDistance((int)sortedBeacons.get(i).second);
+                    Log.e("Mac Adress",getRoom().getMacAddress((int)sortedBeacons.get(i).second));
+                    Log.e("xpostion",xArray[i]+"");
+                    Log.e("ypostion",yArray[i]+"");
+                    Log.e("RSSI", getRoom().getRSSI((int)sortedBeacons.get(i).second)+"");
+                    Log.e("distance",rArray[i]+"");
+                    if(rArray[i] == 0.0){
+                        sum = getRoom().getLocation((int)sortedBeacons.get(i).second);
+                    }
+                    if(rArray[i] >= 99 && i < 3)
                         return;
                 }
 
-                 int x = (int)computeX(xArray[0], xArray[1], xArray[2], yArray[0], yArray[1], yArray[2], rArray[0], rArray[1], rArray[2]);
-                 int y = (int) computeY(xArray[0], xArray[1], yArray[0], yArray[1], rArray[0], rArray[1], x);
-                 Coordinate sum = new Coordinate(x,y);
-                Snackbar.make(getActivity().findViewById(R.id.rl), "location: (" + sum.getFirst() +" , "+ sum.getSecond()+")", Snackbar.LENGTH_LONG).setAction("Action", null).show();
+                if(sum == null){
+                    int x = (int)computeX(xArray[0], xArray[1], xArray[2], yArray[0], yArray[1], yArray[2], rArray[0], rArray[1], rArray[2]);
+                    int y = (int) computeY(xArray[0], xArray[1], yArray[0], yArray[1], rArray[0], rArray[1], x);
+                    sum = new Coordinate(x,y);
+                }
+                if(sum != null)
+                    Snackbar.make(getActivity().findViewById(R.id.rl), "location: (" + sum.getFirst() +" , "+ sum.getSecond()+")", Snackbar.LENGTH_LONG).setAction("Action", null).show();
 //                 if(discovered.size()<3)
 //                     return ;
 //
@@ -293,23 +294,6 @@ public class RoomFragment extends MyFragment {
                         params.topMargin = (int)(sum.getSecond() * getRoom().getScaleFactor() + getRoom().getYTranslation());
                         humanMarker.setLayoutParams(params);
                     }
-//                    else{
-//                        getRoom().getDistances().clearDistances();
-//                        getRoom().getDistances().clearStandardDeviation();
-//                    }
-//                if(sum.getFirst() <min.getFirst() )
-//                    sum.setFirst(min.getFirst());
-//                if(sum.getFirst() > max.getFirst())
-//                    sum.setFirst(max.getFirst());
-//                if(sum.getSecond() < min.getSecond())
-//                    sum.setSecond(min.getSecond());
-//                if(sum.getSecond() > max.getSecond())
-//                    sum.setSecond(max.getSecond());
-//                params.leftMargin = (int)(sum.getFirst() * getRoom().getScaleFactor() + getRoom().getXTranslation());
-//                params.topMargin = (int)(sum.getSecond() * getRoom().getScaleFactor() + getRoom().getYTranslation());
-//                humanMarker.setLayoutParams(params);
-
-
                 }
         });
     }
