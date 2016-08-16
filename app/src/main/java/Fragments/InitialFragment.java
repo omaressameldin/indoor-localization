@@ -17,13 +17,20 @@ import android.widget.ToggleButton;
 import com.estimote.sdk.Beacon;
 import com.estimote.sdk.BeaconManager;
 import com.estimote.sdk.Region;
+import com.estimote.sdk.repackaged.gson_v2_3_1.com.google.gson.JsonObject;
 import com.example.oessa_000.countsteps.R;
 
+import org.json.JSONException;
+import org.json.JSONObject;
+
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 import Classes.Coordinate;
+import Classes.HTTPRequest;
 import Classes.MyFragment;
 import Classes.Room;
 import Classes.RoomEstimote;
@@ -42,16 +49,17 @@ public class InitialFragment extends MyFragment implements SensorEventListener {
     private double prevY;
     private boolean ignoreGravityIncrease;
     private int waitingCountDown;
-
     /* What's going on Variable */
     private int state = 2;
 
     /*Room Variables */
     private ArrayList<RoomEstimote> estimoteRoomCoordinates = new ArrayList<RoomEstimote>();
     private String nearestBeacon;
-    private int[] nearestBeaconRSSIs = new int[10];
+    private int[] nearestBeaconRSSIs = new int[5];
     int nearestBeaconRSSIsArrayIndex = 0;
     int baseRSSI = 0;
+    String roomName;
+    String roomDescription;
 
     /* Sensors Variables */
     private SensorManager mSensorManager;
@@ -72,9 +80,17 @@ public class InitialFragment extends MyFragment implements SensorEventListener {
     private TextView walkingDirectionView;
     private TextView tempView;
     private TextView instructionsView;
+    FloatingActionButton addRoomButton;
 
 
-    public InitialFragment(){}
+    /* HTTP Request Variable */
+    private HTTPRequest http;
+
+
+    public InitialFragment(String roomName, String roomDescription){
+        this.roomDescription = roomDescription;
+        this.roomName = roomName;
+    }
 
 
     public void onActivityCreated(Bundle savedInstanceState){
@@ -83,11 +99,15 @@ public class InitialFragment extends MyFragment implements SensorEventListener {
         stateToggle = (ToggleButton) getActivity().findViewById(R.id.state);
         undoButton = (FloatingActionButton) getActivity().findViewById(R.id.undo);
         doneButton = (FloatingActionButton) getActivity().findViewById(R.id.done);
-        /*Initialize Views */
+        addRoomButton = (FloatingActionButton)getActivity().findViewById(R.id.addRoom);
+        addRoomButton.setVisibility(View.INVISIBLE);
+        /* Initialize Views */
         stepsView = (TextView) getActivity().findViewById((R.id.stepView));
         walkingDirectionView = (TextView) getActivity().findViewById((R.id.walkingDirection));
         tempView = (TextView)getActivity().findViewById((R.id.tempview));
         instructionsView = (TextView) getActivity().findViewById((R.id.instructions));
+        /* Initialize HTTP Variable */
+        http = new HTTPRequest();
         /* Button Actions */
         buttonsActions();
     }
@@ -128,8 +148,9 @@ public class InitialFragment extends MyFragment implements SensorEventListener {
             public void onClick(View view) {
                 if (state !=2) {
                     if (estimoteRoomCoordinates.size() > 3) {
-                        setRoom(new Room(estimoteRoomCoordinates));
-                        changeFragment(getActivity(), new RoomFragment(),"roomFragment");
+//                        setRoom(new Room(estimoteRoomCoordinates));
+                        http.addRoom(getFragmentManager().findFragmentByTag("InitialFragment"),roomName, roomDescription,estimoteRoomCoordinates);
+//                        changeFragment(getActivity(), new RoomFragment(walkingDirection),"roomFragment");
                     } else {
                         Snackbar.make(view, "There is no room with only 2 walls :(", Snackbar.LENGTH_LONG)
                                 .setAction("Action", null).show();
@@ -160,7 +181,6 @@ public class InitialFragment extends MyFragment implements SensorEventListener {
             }
         });
     }
-
 
     public void connectBeaconManager(){
         /* Start Communication with Estimote Beacons */
@@ -194,7 +214,7 @@ public class InitialFragment extends MyFragment implements SensorEventListener {
                 nearestBeaconRSSIsArrayIndex = (nearestBeacon != nearestBeaconID)? 0 : nearestBeaconRSSIsArrayIndex;
                 nearestBeaconRSSIs[nearestBeaconRSSIsArrayIndex++] = strongestRssi;
                 /* got 20 values then let's calculate RSSI value */
-                if(nearestBeaconRSSIsArrayIndex == 10){
+                if(nearestBeaconRSSIsArrayIndex == 5){
                     nearestBeaconRSSIsArrayIndex = 0;
                     baseRSSI = getBaseRSSI();
                     addCoordinate((float) stepCount * 0.76f);
@@ -256,7 +276,7 @@ public class InitialFragment extends MyFragment implements SensorEventListener {
                         waitingCountDown --;
                         ignoreGravityIncrease = (waitingCountDown <= 0)? false : true;
                     }
-                    if( ((int)prevY - (int) event.values[1]) >= 1 &&  (prevY - event.values[1]) >= 0.5 &&!ignoreGravityIncrease){
+                    if( ((int)prevY - (int) event.values[1]) >= 0.95 &&!ignoreGravityIncrease){
                         stepCount++;
                         stepsView.setText("Step Count: " + stepCount);
                         waitingCountDown = 2;
@@ -391,5 +411,6 @@ public class InitialFragment extends MyFragment implements SensorEventListener {
         mSensorManager.unregisterListener(this, mSensorGravity);
         mSensorManager.unregisterListener(this, mSensorGyroscope);
     }
+
 
 }

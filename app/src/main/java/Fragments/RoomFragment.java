@@ -1,11 +1,26 @@
 package Fragments;
 
+import android.Manifest;
+import android.annotation.TargetApi;
 import android.app.Activity;
+import android.content.BroadcastReceiver;
+import android.content.Context;
+import android.content.Intent;
+import android.content.IntentFilter;
+import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
+import android.hardware.Sensor;
+import android.hardware.SensorEvent;
+import android.hardware.SensorEventListener;
+import android.hardware.SensorManager;
+import android.net.wifi.ScanResult;
+import android.net.wifi.WifiManager;
+import android.os.Build;
 import android.os.Bundle;
+import android.support.design.widget.FloatingActionButton;
 import android.support.design.widget.Snackbar;
 import android.util.DisplayMetrics;
 import android.util.Log;
@@ -19,73 +34,81 @@ import android.widget.RelativeLayout;
 import com.estimote.sdk.Beacon;
 import com.estimote.sdk.BeaconManager;
 import com.estimote.sdk.Region;
-import com.estimote.sdk.Utils;
 import com.example.oessa_000.countsteps.R;
 
+import org.json.JSONObject;
+
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.UUID;
 
 import Classes.Coordinate;
+import Classes.HTTPRequest;
 import Classes.MyFragment;
-import Classes.Room;
 import Classes.RoomEstimote;
 
 import static com.example.oessa_000.countsteps.MainActivity.getBeaconManager;
 import static com.example.oessa_000.countsteps.MainActivity.getRoom;
-import static com.example.oessa_000.countsteps.MainActivity.setRoom;
-import static com.example.oessa_000.countsteps.MainActivity.setRoomScaleFactor;
 
 /**
  * Created by oessa_000 on 3/31/2016.
  */
-public class RoomFragment extends MyFragment {
+public class RoomFragment extends MyFragment implements SensorEventListener {
 
     int beaconDetectedCount = 0;
+    /* Drawing Vairables */
     private Canvas canvas;
     private ImageView drawingImageView;
     private ImageView humanMarker;
-    private Coordinate min;
-    private Coordinate max;
     private RelativeLayout.LayoutParams params ;
+    /* Location Variables */
     private ArrayList<Pair> estimoteCoordinates = new ArrayList<Pair>();
-    private int stepCount;
-    private int directionWalked;
+    private Coordinate location;
+    /* Step Counter Variables */
+    private int stepCount = 0;
+    private double prevY;
+    private boolean ignoreGravityIncrease;
+    private int waitingCountDown = 2;
+    /* Sensors Variables */
+    private SensorManager mSensorManager;
+    private Sensor mSensorGravity;
+    private Sensor mSensorGyroscope;
+    /* Walking Direction Variables */
+    private int walkingDirection ; /* 1 --> forward, 2 --> backward, 3 --> left, 4 --> right */
+    private boolean turningNow;
+    /* Server Request Variable */
+    HTTPRequest http;
+    /* Transfer Learning Variables */
+    private BroadcastReceiver wifiReceiver;
+    private WifiManager mainWifiManager;
+    private ArrayList<HashMap<String,String>> accessPoints;
+    private boolean finishedScan = false;
+    /* Floating Action Button */
+    private FloatingActionButton addRoomButton;
+
+    public RoomFragment(){}
+
+    public RoomFragment(int walkingDirection){
+        this.walkingDirection = walkingDirection;
+    }
 
     public void onActivityCreated(Bundle savedInstanceState){
         super.onCreate(savedInstanceState);
-
-        Coordinate pixelDimensions = getPixelDimensions(getActivity());
-
-        Bitmap bitmap = Bitmap.createBitmap((int) getActivity().getWindowManager()
-                .getDefaultDisplay().getWidth(), (int) getActivity().getWindowManager()
-                .getDefaultDisplay().getHeight(), Bitmap.Config.ARGB_8888);
-        canvas = new Canvas(bitmap);
-
+        /* Hide add room Button */
+        addRoomButton = (FloatingActionButton)getActivity().findViewById(R.id.addRoom);
+        addRoomButton.setVisibility(View.INVISIBLE);
+        /* Initialize Views */
         drawingImageView = (ImageView) getActivity().findViewById(R.id.room);
-        drawingImageView.setImageBitmap(bitmap);
+        /* Initialize Wifi Manager */
+        mainWifiManager = (WifiManager) getActivity().getSystemService(Context.WIFI_SERVICE);
+        /* Initialize http */
+        http = new HTTPRequest();
+        /* Draw the Room*/
+        drawRoom();
+        /* Set up Transfer Learning */
+        startLearning();
 
-        RelativeLayout rl = (RelativeLayout) getActivity().findViewById(R.id.rl);
-        params =  new RelativeLayout.LayoutParams(96, 96);
-        humanMarker = (ImageView) new ImageView(getActivity());
-        humanMarker.setImageResource(R.drawable.marker);
-        rl.addView(humanMarker, params);
-
-        params.leftMargin = 1340;
-        params.topMargin = 1340;
-
-
-        Paint paint = initializePaint();
-        getRoom().setScaleFactor(pixelDimensions);
-        getRoom().setXTranslation((float)Math.abs(getRoom().getMinValueOfCoordinates().getFirst())*getRoom().getScaleFactor());
-        getRoom().setYTranslation(  Math.abs((float)getRoom().getMinValueOfCoordinates().getSecond())*getRoom().getScaleFactor()+pixelDimensions.getSecond()/4);
-        drawRoom(paint);
-        min = getRoom().getMinValueOfCoordinates();
-        max = getRoom().getMaxValueOfCoordinates();
-        String coordinatesString = "";
-        for(int i = 0; i < getRoom().getCoordinates().length; i++){
-            coordinatesString += ((Coordinate)getRoom().getCoordinates()[i].getLocation()).getFirst() + "," + ((Coordinate)getRoom().getCoordinates()[i].getLocation()).getSecond() + "\n";
-        }
     }
 
     public View onCreateView(LayoutInflater inflater, ViewGroup container,
@@ -94,34 +117,31 @@ public class RoomFragment extends MyFragment {
         return inflater.inflate(R.layout.room_view, container, false);
     }
 
-    public Paint initializePaint(){
-        Paint paint = new Paint();
-        paint.setStyle(Paint.Style.STROKE);
-        paint.setColor(Color.RED);
-        paint.setStrokeWidth(6);
-        return paint ;
-    }
 
-    public Coordinate getPixelDimensions( Activity mainActivity){
-        DisplayMetrics dm = new DisplayMetrics();
-        mainActivity.getWindowManager().getDefaultDisplay().getMetrics(dm);
-        return new Coordinate(dm.widthPixels, dm.heightPixels);
-    }
-
-
-    public void drawRoom( Paint paint){
-//        canvas.translate(getRoom().getXTranslation(),getRoom().getYTranslation());
+    public void drawRoom(){
+        /* Get Phone's pixel dimenstion */
+        Coordinate pixelDimensions = getPixelDimensions(getActivity());
+        /* set Room's scaling according to phone's pixel dimensions */
+        getRoom().setScaleFactor(pixelDimensions);
+        getRoom().setXTranslation((float)Math.abs(getRoom().getMinValueOfCoordinates().getFirst())*getRoom().getScaleFactor());
+        getRoom().setYTranslation(  Math.abs((float)getRoom().getMinValueOfCoordinates().getSecond())*getRoom().getScaleFactor()+pixelDimensions.getSecond()/4);
+        /* create a new canvas for drawing the room */
+        Bitmap bitmap = Bitmap.createBitmap((int) getActivity().getWindowManager()
+                .getDefaultDisplay().getWidth(), (int) getActivity().getWindowManager()
+                .getDefaultDisplay().getHeight(), Bitmap.Config.ARGB_8888);
+        canvas = new Canvas(bitmap);
+        /* set Image view's bitmap */
+        drawingImageView.setImageBitmap(bitmap);
+        /* add walking Human */
+        RelativeLayout rl = (RelativeLayout) getActivity().findViewById(R.id.rl);
+        params =  new RelativeLayout.LayoutParams(96, 96);
+        humanMarker = (ImageView) new ImageView(getActivity());
+        humanMarker.setImageResource(R.drawable.marker);
+        rl.addView(humanMarker, params);
+        /* Initialize Paint */
+        Paint paint = initializePaint();
+        /* Scale coordiantes and connect them */
         RoomEstimote[] coordinates = getRoom().getCoordinates();
-        // Coordinate startPoint = (coordinates.size() > 0)? (Coordinate)coordinates.get(0).second : new Coordinate(0,0) ;
-        // for(int i = 1; i < coordinates.size(); i++){
-        //     ((Coordinate)coordinates.get(i).second).setFirst(((Coordinate)coordinates.get(i).second).getFirst() * getRoom().getScaleFactor() + getRoom().getXTranslation());
-        //     ((Coordinate)coordinates.get(i).second).setSecond(((Coordinate)coordinates.get(i).second).getSecond() * getRoom().getScaleFactor() + getRoom().getYTranslation());
-        //     canvas.drawLine(startPoint.getFirst(), startPoint.getSecond(), ((Coordinate)coordinates.get(i).second).getFirst(), ((Coordinate)coordinates.get(i).second).getSecond(), paint);
-        //     startPoint = (Coordinate)coordinates.get(i).second;
-        // }
-        // canvas.drawLine(startPoint.getFirst(),startPoint.getSecond(),((Coordinate)coordinates.get(0).second).getFirst(),((Coordinate)coordinates.get(0).second).getSecond(),paint);
-
-
          Coordinate startPoint =  new Coordinate((coordinates[0].getLocation()).getFirst() * getRoom().getScaleFactor() + getRoom().getXTranslation(),
                  (coordinates[0].getLocation()).getSecond() * getRoom().getScaleFactor() + getRoom().getYTranslation());
         Coordinate endPoint;
@@ -146,6 +166,64 @@ public class RoomFragment extends MyFragment {
          endPoint = new Coordinate((coordinates[0].getLocation()).getFirst() * getRoom().getScaleFactor() + getRoom().getXTranslation(),
                  (coordinates[0].getLocation()).getSecond() * getRoom().getScaleFactor() + getRoom().getYTranslation());
         canvas.drawLine(startPoint.getFirst(),startPoint.getSecond(),endPoint.getFirst(),endPoint.getSecond(),paint);
+        setLocation( new Coordinate(coordinates[coordinates.length - 1].getLocation().getFirst(), coordinates[coordinates.length - 1].getLocation().getSecond()) );
+    }
+
+
+    public Coordinate getPixelDimensions( Activity mainActivity){
+        DisplayMetrics dm = new DisplayMetrics();
+        mainActivity.getWindowManager().getDefaultDisplay().getMetrics(dm);
+        return new Coordinate(dm.widthPixels, dm.heightPixels);
+    }
+
+
+    public Paint initializePaint(){
+        Paint paint = new Paint();
+        paint.setStyle(Paint.Style.STROKE);
+        paint.setColor(Color.RED);
+        paint.setStrokeWidth(6);
+        return paint ;
+    }
+
+    public void startLearning() {
+        if ((android.os.Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && getActivity().checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED)
+                || (android.os.Build.VERSION.SDK_INT < Build.VERSION_CODES.M)) {
+            Thread t = new Thread() {
+                public void run() {
+                    try {
+                        while (true) {
+                            mainWifiManager.startScan();
+                            Thread.sleep(400);
+                        }
+                    } catch(InterruptedException v) {
+                        System.out.println(v);
+                    }
+                }
+            };
+            t.start();
+            recordLearning();
+
+        }
+    }
+
+
+    public void recordLearning(){
+        wifiReceiver = new BroadcastReceiver(){
+            @Override
+            public void onReceive(Context context, Intent intent) {
+                List<ScanResult>results = mainWifiManager.getScanResults();
+                accessPoints = new ArrayList<HashMap<String, String>>();
+                for(ScanResult r : results){
+                    HashMap<String,String> accessPoint = new HashMap<String,String>();
+                    accessPoint.put("mac",r.BSSID);
+                    accessPoint.put("rssi",r.level+"");
+                    accessPoints.add(accessPoint);
+                }
+                finishedScan = true;
+            }
+        };
+        getActivity().registerReceiver(wifiReceiver, new IntentFilter(WifiManager.SCAN_RESULTS_AVAILABLE_ACTION));
+
     }
 
 
@@ -195,109 +273,120 @@ public class RoomFragment extends MyFragment {
         });
         getBeaconManager().setRangingListener(new BeaconManager.RangingListener() {
             public void onBeaconsDiscovered(Region region, List<Beacon> list) {
+
                 if(list.size() < 3)
                     return ;
+                Log.e("Step Count", stepCount+"");
+                Log.e("Walking Direction", walkingDirection+"");
 
+                Coordinate sum = null;
                 ArrayList<Pair> discovered = new ArrayList<Pair>();
                 Log.e("RoomEstimotes Size", getRoom().getCoordinates().length+"");
                 for(Beacon b : list){
                     int index = getRoom().findBeacon(b.getMacAddress().toString());
-                    if(index != -1 && getRoom().addRSSI(index, b.getRssi())) {
+                    if(index != -1) {
+                        getRoom().addRSSI(index, b.getRssi());
                         discovered.add(new Pair(b, index));
+                        double distance = getRoom().getApproximateDistance(index);
+                        Log.e("mac", b.getMacAddress().toString() );
+                        Log.e("Base RSSI", getRoom().getBaseRSSI(index)+"");
+                        Log.e("RSSI", getRoom().getRSSI(index)+"");
+
+
+//                        Snackbar.make(getActivity().findViewById(R.id.rl), "mac: " +b.getMacAddress()+ "\ndistance: " + distance, Snackbar.LENGTH_LONG).setAction("Action", null).show();
+                        if(distance == 0.0){
+//                            Snackbar.make(getActivity().findViewById(R.id.rl), "mac: " +b.getMacAddress()+ "\ndistance: " + distance, Snackbar.LENGTH_LONG).setAction("Action", null).show();
+                            sum = getRoom().getLocation(index);
+                            stepCount = 0;
+                            setLocation(sum);
+                        }
                     }
                 }
-                if(discovered.size() < 3)
+                if(sum != null || discovered.size() < 3 || stepCount == 0 )
                     return;
-                ArrayList<Pair> sortedBeacons = mergeSortBeacons(discovered,0,discovered.size() -1);
-                 if(sortedBeacons.size() < 3)
-                    return;
+                int tempStepCount = stepCount;
+                stepCount = 0;
+//                ArrayList<Pair> sortedBeacons = mergeSortBeacons(discovered,0,discovered.size() -1);
+                ArrayList<Pair> sortedBeacons = discovered;
+
 
                 double[] xArray= new double[sortedBeacons.size()];
                 double[] yArray= new double[sortedBeacons.size()];
                 double[] rArray= new double[sortedBeacons.size()];
-                Coordinate sum = null;
-                for(int i = 0; i< 3; i ++){
-
-                    xArray[i] = getRoom().getXCoordinate((int)sortedBeacons.get(i).second);
-                    yArray[i] = getRoom().getYCoordinate((int)sortedBeacons.get(i).second);
-                    rArray[i] = getRoom().getApproximateDistance((int)sortedBeacons.get(i).second);
+                Coordinate approximateLocation = new Coordinate(location.getFirst(), location.getSecond());
+                if(walkingDirection == 1)
+                    approximateLocation.setFirst(approximateLocation.getFirst()+(tempStepCount * 0.76f));
+                else if(walkingDirection == 2)
+                    approximateLocation.setFirst(approximateLocation.getFirst()-(tempStepCount * 0.76f));
+                else if(walkingDirection == 3)
+                    approximateLocation.setFirst(approximateLocation.getSecond()+(tempStepCount * 0.76f));
+                else if(walkingDirection == 4)
+                    approximateLocation.setFirst(approximateLocation.getSecond()-(tempStepCount * 0.76f));
+                for(int i = 0; i< sortedBeacons.size() ; i++){
+                    int indexOfClosestSoFar = i;
+                    double shortestDistanceSoFar = approximateLocation.computeDistance(getRoom().getLocation((int)sortedBeacons.get(i).second));
+                    for(int j = i + 1; j<sortedBeacons.size(); j++){
+                        double beaconDistance = approximateLocation.computeDistance(getRoom().getLocation((int)sortedBeacons.get(j).second));
+                        if(beaconDistance < shortestDistanceSoFar){
+                            indexOfClosestSoFar = j;
+                            shortestDistanceSoFar = beaconDistance;
+                        }
+                    }
+                    Pair temp =sortedBeacons.get(i);
+                    sortedBeacons.set(i, sortedBeacons.get(indexOfClosestSoFar));
+                    sortedBeacons.set(indexOfClosestSoFar,temp );
+                }
+                String mac = "";
+                for(int i = 0, j=0; i< sortedBeacons.size(); i ++){
+                    if(!getRoom().getMacAddress((int)sortedBeacons.get(i).second).contains("FE") &&
+                            !getRoom().getMacAddress((int)sortedBeacons.get(i).second).contains("D2") &&
+                            ! getRoom().getMacAddress((int)sortedBeacons.get(i).second).contains("F1")) {
+                        continue;
+                    }
+                    xArray[j] = getRoom().getLocation((int)sortedBeacons.get(i).second).getFirst();
+                    yArray[j] = getRoom().getLocation((int)sortedBeacons.get(i).second).getSecond();
+                    rArray[j] = getRoom().getApproximateDistance((int)sortedBeacons.get(i).second);
+                    if(rArray[j] == -1)
+                        return;
+                    j++;
                     Log.e("Mac Adress",getRoom().getMacAddress((int)sortedBeacons.get(i).second));
+//                    mac += getRoom().getMacAddress((int)sortedBeacons.get(i).second) + "   ";
                     Log.e("xpostion",xArray[i]+"");
                     Log.e("ypostion",yArray[i]+"");
                     Log.e("RSSI", getRoom().getRSSI((int)sortedBeacons.get(i).second)+"");
                     Log.e("distance",rArray[i]+"");
-                    if(rArray[i] == 0.0){
-                        sum = getRoom().getLocation((int)sortedBeacons.get(i).second);
-                    }
-                    if(rArray[i] >= 99 && i < 3)
-                        return;
                 }
-
+                Snackbar.make(getActivity().findViewById(R.id.rl), mac, Snackbar.LENGTH_LONG).setAction("Action", null).show();
                 if(sum == null){
                     int x = (int)computeX(xArray[0], xArray[1], xArray[2], yArray[0], yArray[1], yArray[2], rArray[0], rArray[1], rArray[2]);
                     int y = (int) computeY(xArray[0], xArray[1], yArray[0], yArray[1], rArray[0], rArray[1], x);
                     sum = new Coordinate(x,y);
+                    setLocation(sum);
                 }
-                if(sum != null)
-                    Snackbar.make(getActivity().findViewById(R.id.rl), "location: (" + sum.getFirst() +" , "+ sum.getSecond()+")", Snackbar.LENGTH_LONG).setAction("Action", null).show();
-//                 if(discovered.size()<3)
-//                     return ;
-//
-//
-//                     ArrayList<Coordinate> locations = new ArrayList<Coordinate>();
-//                     for(int i = 0; i< discovered.size();i++){
-//                         // double x1 = ((Coordinate)discovered.get(i).second).getFirst();
-//                         // double y1 = ((Coordinate)discovered.get(i).second).getSecond();
-//                         // double r1 = Utils.computeAccuracy((Beacon) discovered.get(i).first)*getRoom().getScaleFactor();
-//                         double x1 = getRoom().getXCoordinate((int)discovered.get(i).second);
-//                         double y1 = getRoom().getYCoordinate((int)discovered.get(i).second);
-//                         double r1 = getRoom().getApproximateDistance((int)discovered.get(i).second, Utils.computeAccuracy((Beacon) discovered.get(i).first));
-//                         if(r1 < 0)
-//                             continue;
-//                         for(int j=i + 1; j< discovered.size(); j++){
-//                             // double x2 = ((Coordinate)discovered.get(j).second).getFirst();
-//                             // double y2 = ((Coordinate)discovered.get(j).second).getSecond();
-//                             // double r2 = Utils.computeAccuracy((Beacon) discovered.get(j).first)*getRoom().getScaleFactor();
-//                             double x2 = getRoom().getXCoordinate((int)discovered.get(j).second);
-//                             double y2 = getRoom().getYCoordinate((int)discovered.get(j).second);
-//                             double r2 = getRoom().getApproximateDistance((int)discovered.get(j).second, Utils.computeAccuracy((Beacon) discovered.get(j).first));
-//                             if(r2 < 0)
-//                                 continue;
-//                             for( int k = j + 1; k< discovered.size(); k++  ){
-//                                 // double x3 = ((Coordinate)discovered.get(k).second).getFirst();
-//                                 // double y3 = ((Coordinate)discovered.get(k).second).getSecond();
-//                                 // double r3 = Utils.computeAccuracy((Beacon) discovered.get(k).first)*getRoom().getScaleFactor();
-//                                 double x3 = getRoom().getXCoordinate((int)discovered.get(k).second);
-//                                 double y3 = getRoom().getYCoordinate((int)discovered.get(k).second);
-//                                 double r3 = getRoom().getApproximateDistance((int)discovered.get(k).second, Utils.computeAccuracy((Beacon) discovered.get(k).first));
-//                                 if(r3 < 0)
-//                                     continue;
-//                                 double x = computeX(x1, x2, x3, y1, y2, y3, r1, r2, r3);
-//                                 double y = computeY(x1, x2, y1, y2, r1, r2, x);
-//                                 if(Double.isNaN(x) || Double.isNaN(y))
-//                                     continue;
-//                                 Log.e("foundLocation", "x1: "+ x1+",x2: "+x2 +",x3: "+ x3+ ",y1: "+y1+",y2: "+y2+",y3: "+y3+",r1: "+r1+",r2: "+r2+",r3: "+r3);
-//                                 locations.add(locations.size(), new Coordinate((float)x, (float)y));
-//                             }
-//                         }
-//                     }
-//                     Coordinate sum = new Coordinate(0,0);
-//                     for(Coordinate l : locations){
-//                         sum.setFirst(sum.getFirst() + l.getFirst());
-//                         sum.setSecond(sum.getSecond() + l.getSecond());
-//                     }
-//                     sum.setFirst((int)Math.floor(sum.getFirst()/locations.size()));
-//                     sum.setSecond((int)Math.floor(sum.getSecond()/locations.size()));
-
-                    if(sum.getFirst() >= (min.getFirst()) && sum.getFirst() <= (max.getFirst()) && sum.getSecond() >= (min.getSecond()) && sum.getSecond() <= (max.getSecond())  ){
-                        params.leftMargin = (int)(sum.getFirst() * getRoom().getScaleFactor() + getRoom().getXTranslation());
-                        params.topMargin = (int)(sum.getSecond() * getRoom().getScaleFactor() + getRoom().getYTranslation());
-                        humanMarker.setLayoutParams(params);
-                    }
-                }
+            }
         });
     }
 
+
+    public void setLocation(Coordinate sum){
+        if(sum.getFirst() < getRoom().getMinValueOfCoordinates().getFirst())
+            sum.setFirst(getRoom().getMinValueOfCoordinates().getFirst());
+        if(sum.getFirst() > getRoom().getMaxValueOfCoordinates().getFirst())
+            sum.setFirst(getRoom().getMaxValueOfCoordinates().getFirst());
+        if(sum.getSecond() < getRoom().getMinValueOfCoordinates().getSecond())
+            sum.setSecond(getRoom().getMinValueOfCoordinates().getSecond());
+        if(sum.getSecond() > getRoom().getMaxValueOfCoordinates().getSecond())
+            sum.setSecond(getRoom().getMaxValueOfCoordinates().getSecond());
+        location = sum;
+            Snackbar.make(getActivity().findViewById(R.id.rl), "location: (" + sum.getFirst() + " , " + sum.getSecond() + ")", Snackbar.LENGTH_LONG).setAction("Action", null).show();
+            params.leftMargin = (int)(sum.getFirst() * getRoom().getScaleFactor() + getRoom().getXTranslation()) + 100;
+            params.topMargin = (int)(sum.getSecond() * getRoom().getScaleFactor() + getRoom().getYTranslation()) + 100;
+            humanMarker.setLayoutParams(params);
+            if(finishedScan) {
+                finishedScan = false;
+                http.addFingerPrint(this, accessPoints, sum, getRoom().getRoomID());
+            }
+    }
 
     public double computeX(double x1, double x2, double x3, double y1, double y2, double y3, double r1, double r2, double r3){
 
@@ -333,6 +422,95 @@ public class RoomFragment extends MyFragment {
 
     public void onResume() {
         super.onResume();
+        /* Initialize Sensors */
+        mSensorManager = (SensorManager) getActivity().getSystemService(Context.SENSOR_SERVICE);
+        mSensorGravity = mSensorManager.getDefaultSensor(Sensor.TYPE_GRAVITY);
+        mSensorGyroscope = mSensorManager.getDefaultSensor(Sensor.TYPE_GYROSCOPE);
+
+        /* Set Sensors Delay */
+        mSensorManager.registerListener(this, mSensorGravity,
+                SensorManager.SENSOR_DELAY_NORMAL);
+        mSensorManager.registerListener(this, mSensorGyroscope,
+                SensorManager.SENSOR_DELAY_NORMAL);
+    }
+
+    @Override
+    public void onSensorChanged(SensorEvent event) {
+        Sensor sensor = event.sensor;
+        switch(sensor.getType()){
+            /* Gravity Sensor For Walking and Step Count */
+            case Sensor.TYPE_GRAVITY:
+                    if(ignoreGravityIncrease){
+                        waitingCountDown --;
+                        ignoreGravityIncrease = (waitingCountDown <= 0)? false : true;
+                    }
+                    if( ((int)prevY - (int) event.values[1]) >= 0.95 &&!ignoreGravityIncrease){
+                        stepCount++;
+                        waitingCountDown = 2;
+                        ignoreGravityIncrease = true;
+                    }
+                prevY = event.values[1];
+                break;
+            /* Gyroscope For Getting The Walking Direction */
+            case Sensor.TYPE_GYROSCOPE:
+                    if(turningNow){
+                        if(Math.abs(event.values[2]) < 0.3){
+                            turningNow = false;
+
+                        }
+                    }
+                        /*
+                     forward + right = right
+                     backward + right = left
+                     left + right = forward
+                     right + right = backward
+                      */
+                    if(!turningNow) {
+                        if(event.values[2] < -1  ) {
+                            turningNow = true;
+                            if(walkingDirection == 1) {
+                                walkingDirection = 4;
+                            }
+                            else if(walkingDirection == 2) {
+                                walkingDirection = 3;
+                            }
+                            else if(walkingDirection == 3) {
+                                walkingDirection = 1;
+                            }
+                            else if(walkingDirection == 4) {
+                                walkingDirection = 2;
+                            }
+                        }
+                        /*
+                     forward + left = left
+                     backward + left = right
+                     left + left = backward
+                     right + left = forward
+                      */
+                        if(event.values[2] > 1) {
+                            turningNow = true;
+                            if(walkingDirection == 1) {
+                                walkingDirection = 3;
+                            }
+                            else if(walkingDirection == 2) {
+                                walkingDirection = 4;
+                            }
+                            else if(walkingDirection == 3) {
+                                walkingDirection = 2;
+                            }
+                            else if(walkingDirection == 4) {
+                                walkingDirection = 1;
+                            }
+                        }
+                    }
+                break;
+        }
+    }
+
+    @Override
+    public void onAccuracyChanged(Sensor sensor, int accuracy) {
 
     }
+
+
 }

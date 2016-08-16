@@ -33,5 +33,11 @@ public class Coordinate {
         return(c.getFirst() == this.getFirst() && c.getSecond() == this.getSecond());
     }
 
+    public double computeDistance(Coordinate x){
+        double elementOne = Math.pow((x.getSecond() - second),2);
+        double elementTwo = Math.pow((x.getFirst() - first),2);
+        return Math.sqrt(elementOne + elementTwo);
+    }
+
 }
 

@@ -10,47 +10,69 @@ public class RoomEstimote {
     private int baseRSSI;
     private String beaconID;
     private double standardDeviation;
-    private double[] RSSIs;
-    private int  RSSIArrayIndex;
-    private double previousRSSI;
+    private int  rssiArrayIndex;
+    private double currentRSSI;
+    private ArrayList<Integer> allRSSIs;
+    private int size = 10;
+    private double avg = 0;
+    private double alpha = 0.95;
+
+
 
     public RoomEstimote( String beaconID, int baseRSSI, Coordinate location){
         this.location = location;
         this.baseRSSI = baseRSSI;
         this.beaconID = beaconID;
         standardDeviation = 0;
-        RSSIs = new double[2];
-        RSSIArrayIndex = -1;
-        previousRSSI = 0;
+        rssiArrayIndex = 0;
+        currentRSSI = 0;
+        allRSSIs = new ArrayList<Integer>();
     }
 
     public double getRSSIFilteredValue(){
 
-            return previousRSSI;
+            return currentRSSI;
     }
 
-    public boolean addRSSIFilteredValue(int RSSI){
-//        boolean isFirstRSSIValue = (previousRSSI == 0);
-//        previousRSSI = (isFirstRSSIValue) ? RSSI :
-//                0.95 * previousRSSI + 0.05 * RSSI;
-//        return isFirstRSSIValue;
-
-        previousRSSI = RSSI;
-        return true;
+    public void addRSSIValue(int RSSI){
+        /* low pass filter on new RSSI value */
+        int lowPassFilteredRSSI = (currentRSSI !=  0)?(int)(alpha *currentRSSI + (1-alpha) * RSSI) : RSSI ;
+        /* if no standard deviation set yet just add the value */
+        if(standardDeviation == 0) {
+            allRSSIs.add(lowPassFilteredRSSI);
+            if(allRSSIs.size() == size){
+                 /* set the first standard deviation after getting 10 values */
+                standardDeviationFilter();
+            }
+        }
+        /* else check if the difference is lower than the standard deviation */
+        else  if(Math.abs(avg - lowPassFilteredRSSI) < standardDeviation){
+            currentRSSI = lowPassFilteredRSSI;
+            allRSSIs.set(rssiArrayIndex ++, lowPassFilteredRSSI);
+            /* set the new standard deviation value */
+            standardDeviationFilter();
+        }
     }
 
-    public void calculateStandardDeviation(){
+
+    public void standardDeviationFilter(){
         /* calculate Average of RSSI values */
-        double avg = 0;
-        for(int i = 0; i < RSSIs.length; i++){
-            avg += RSSIs[i];
+         avg = 0;
+        for(int i = 0; i < allRSSIs.size(); i++){
+            avg += allRSSIs.get(i);
         }
-        avg = avg/RSSIs.length ;
+        avg = avg/allRSSIs.size() ;
         /* calculate standard deviation of RSSI values */
-        for(int i = 0; i<RSSIs.length; i++){
-            standardDeviation += Math.pow((RSSIs[i] - avg), 2);
+        for(int i = 0; i<allRSSIs.size(); i++){
+            standardDeviation += Math.pow((allRSSIs.get(i) - avg), 2);
         }
-        standardDeviation = Math.sqrt(standardDeviation / RSSIs.length) ;
+        standardDeviation = Math.sqrt(standardDeviation / allRSSIs.size()) ;
+        for(int i=0 ; i< allRSSIs.size(); i++){
+            if(Math.abs(allRSSIs.get(i) - avg) > standardDeviation) {
+                allRSSIs.remove(i);
+                i--;
+            }
+        }
     }
 
     public Coordinate getLocation(){
@@ -69,13 +91,15 @@ public class RoomEstimote {
     }
 
     public double getApproximateDistance(){
-        if( Math.abs(baseRSSI - previousRSSI) < 5 )
+        if(currentRSSI == 0)
+            return -1;
+        if( Math.abs(baseRSSI - currentRSSI) < 5 )
             return 0.0;
-        else if( Math.abs(baseRSSI - previousRSSI) < 13)
+        else if( Math.abs(baseRSSI - currentRSSI) < 13)
             return 0.5;
-        else if( Math.abs(baseRSSI - previousRSSI) < 25)
+        else if( Math.abs(baseRSSI - currentRSSI) < 25)
             return 1.0;
-        else if( Math.abs(baseRSSI - previousRSSI) < 30)
+        else if( Math.abs(baseRSSI - currentRSSI) < 30)
             return 1.5;
         else
             return 3.0;

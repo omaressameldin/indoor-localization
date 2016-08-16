@@ -7,6 +7,13 @@
     <color name="gray">#414141</color>
     <color name="green">#0B6F2D</color>
     <color name="red">#FF0000</color>
+    <color name="orange"> #FF6347</color>
+    <color name="blueIvy">#3090C7</color>
+    <color name="lightGrey">#f2f2f2</color>
+    <color name="black">#000</color>
+
+
+
     <!--<color name="blue">#0000FF</color>-->
     <!--<color name="yellow">#FFFF00</color>-->
     <!--<color name="purple">#FF00FF</color>-->

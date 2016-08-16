@@ -1,6 +1,7 @@
 package com.example.oessa_000.countsteps;
 
 import android.app.Activity;
+import android.app.ListFragment;
 import android.os.Bundle;
 import android.support.v4.app.Fragment;
 import android.support.v7.app.AppCompatActivity;
@@ -18,6 +19,7 @@ import Classes.Room;
 import Fragments.EstimoteFragment;
 import Fragments.InitialFragment;
 import Fragments.RoomFragment;
+import Fragments.RoomsListFragment;
 import Fragments.TestFragment;
 
 public class MainActivity extends AppCompatActivity {
@@ -32,7 +34,7 @@ public class MainActivity extends AppCompatActivity {
         Toolbar toolbar = (Toolbar) findViewById(R.id.toolbar);
         setSupportActionBar(toolbar);
         beaconManager = new BeaconManager(getApplicationContext());
-        changeFragment(this,new InitialFragment(),"InitialFragment");
+        changeFragment(this,new RoomsListFragment(),"RoomsListFragment");
     }
 
     @Override
@@ -65,10 +67,11 @@ public class MainActivity extends AppCompatActivity {
     public static Room getRoom(){
         return room ;
     }
-    public static  void changeFragment(Activity a, MyFragment fragment, String ft){
+    public static  void changeFragment(Activity a, android.app.Fragment fragment, String ft){
         fragmentTag = ft;
       a.getFragmentManager().beginTransaction().replace(R.id.fragment, fragment, ft).commit();
-        fragment.connectBeaconManager();
+        if(fragment instanceof  MyFragment)
+            ((MyFragment)fragment).connectBeaconManager();
         fragmentTag = ft;
     }
     public static String getFragmentTag(){
@@ -86,13 +89,21 @@ public class MainActivity extends AppCompatActivity {
     protected void onResume() {
         super.onResume();
         SystemRequirementsChecker.checkWithDefaultDialogs(this);
-        MyFragment f = (MyFragment)getFragmentManager().findFragmentByTag(getFragmentTag());
-        f.connectBeaconManager();
-
+        android.app.Fragment f = (android.app.Fragment)getFragmentManager().findFragmentByTag(getFragmentTag());
+        if(f instanceof  MyFragment)
+            ((MyFragment)f).connectBeaconManager();
     }
 
     protected void onStop(){
         super.onStop();
         disconnectBeaconManager();
+    }
+    @Override
+    public void onBackPressed(){
+        if(fragmentTag.equals("RoomFragment") || fragmentTag.equals("InitialFragment") )
+            changeFragment(this, new RoomsListFragment(), "RoomListFragment");
+        else
+            super.onBackPressed();
+
     }
 }

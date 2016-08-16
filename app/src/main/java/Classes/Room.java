@@ -16,13 +16,18 @@ public class Room {
     private float scaleFactor ;
     private float xTranslation;
     private float yTranslation;
+    private Coordinate minValueOfCoordinates;
+    private Coordinate maxValueOfCoordinates;
+    private int roomID;
 
-    public Room(ArrayList<RoomEstimote> coordinates){
-
+    public Room(ArrayList<RoomEstimote> coordinates, int roomID){
+        this.roomID = roomID;
         this.roomEstimotes = new RoomEstimote[coordinates.size()];
         for(int i = 0; i< roomEstimotes.length; i++){
            this.roomEstimotes[i] = coordinates.get(i);
         }
+        setMaxValueOfCoordinates();
+        setMinValueOfCoordinates();
         rssis = new double[coordinates.size()];
         Arrays.fill(rssis,99);
         distances = new Circular2DArray(coordinates.size(), 15);
@@ -50,35 +55,37 @@ public class Room {
         scaleFactor = (roomEstimotes.length > 1 )?    scaleDimension/getlongestDistance() -1 : 0;
     }
 
-    public Coordinate getMinValueOfCoordinates(){
-        Coordinate min = new Coordinate(99999,99999);
+    private void setMinValueOfCoordinates(){
+        minValueOfCoordinates = new Coordinate(99999,99999);
         for(int i = 0; i< roomEstimotes.length; i++){
-            if(((Coordinate)roomEstimotes[i].getLocation()).getFirst() < min.getFirst())
-                min.setFirst(((Coordinate) roomEstimotes[i].getLocation()).getFirst());
-            if (((Coordinate)roomEstimotes[i].getLocation()).getSecond() < min.getSecond())
-                min.setSecond(((Coordinate) roomEstimotes[i].getLocation()).getSecond());
+            if(((Coordinate)roomEstimotes[i].getLocation()).getFirst() < minValueOfCoordinates.getFirst())
+                minValueOfCoordinates.setFirst(((Coordinate) roomEstimotes[i].getLocation()).getFirst());
+            if (((Coordinate)roomEstimotes[i].getLocation()).getSecond() < minValueOfCoordinates.getSecond())
+                minValueOfCoordinates.setSecond(((Coordinate) roomEstimotes[i].getLocation()).getSecond());
         }
-        return min ;
+
     }
-    public Coordinate getMaxValueOfCoordinates(){
-        Coordinate max = new Coordinate(0,0);
+    private void setMaxValueOfCoordinates(){
+         maxValueOfCoordinates = new Coordinate(0,0);
         for(int i = 0; i< roomEstimotes.length; i++){
-            if(((Coordinate)roomEstimotes[i].getLocation()).getFirst() > max.getFirst())
-                max.setFirst(((Coordinate) roomEstimotes[i].getLocation()).getFirst());
-            if (((Coordinate)roomEstimotes[i].getLocation()).getSecond() > max.getSecond())
-                max.setSecond(((Coordinate) roomEstimotes[i].getLocation()).getSecond());
-        }
-        return max ;
+            if(((Coordinate)roomEstimotes[i].getLocation()).getFirst() > maxValueOfCoordinates.getFirst())
+                maxValueOfCoordinates.setFirst(((Coordinate) roomEstimotes[i].getLocation()).getFirst());
+            if (((Coordinate)roomEstimotes[i].getLocation()).getSecond() > maxValueOfCoordinates.getSecond())
+                maxValueOfCoordinates.setSecond(((Coordinate) roomEstimotes[i].getLocation()).getSecond());
+        };
     }
 
-    public boolean addRSSI(int index, int rssi){
-         return roomEstimotes[index].addRSSIFilteredValue(rssi);
+    public void addRSSI(int index, int rssi){
+          roomEstimotes[index].addRSSIValue(rssi);
 
     }
 
     public double getRSSI(int index){
         return  roomEstimotes[index].getRSSIFilteredValue();
+    }
 
+    public int getRoomID(){
+        return this.roomID;
     }
 
     public int findBeacon(String mac){
@@ -100,16 +107,11 @@ public class Room {
         return roomEstimotes[index].getApproximateDistance();
     }
 
-    public float getXCoordinate(int index){
-        return ((Coordinate)roomEstimotes[index].getLocation()).getFirst();
-    }
-
-    public float getYCoordinate(int index){
-        return ((Coordinate)roomEstimotes[index].getLocation()).getSecond();
-    }
-
     public String getMacAddress(int index){
         return roomEstimotes[index].getBeaconID();
+    }
+    public int getBaseRSSI(int index){
+        return roomEstimotes[index].getBaseRSSI();
     }
 
     public Coordinate getLocation(int index){
@@ -131,6 +133,10 @@ public class Room {
     public void setYTranslation(float yt){
         yTranslation = yt;
     }
+
+    public Coordinate getMinValueOfCoordinates(){return minValueOfCoordinates;}
+
+    public Coordinate getMaxValueOfCoordinates(){return maxValueOfCoordinates;}
 
     public RoomEstimote[] getCoordinates(){
         return this.roomEstimotes;
