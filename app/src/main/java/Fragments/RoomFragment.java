@@ -74,6 +74,7 @@ public class RoomFragment extends MyFragment implements SensorEventListener {
     private ArrayList<Pair> estimoteCoordinates = new ArrayList<Pair>();
     private Coordinate location;
     private Coordinate approximateLocation;
+    private boolean stillLearning = false ; //true if estimtoes & false if fingerprinting
     /* Step Counter Variables */
     private int stepCount = 0;
     private double prevY;
@@ -119,7 +120,8 @@ public class RoomFragment extends MyFragment implements SensorEventListener {
         progress = new ProgressDialog(this.getActivity());
         progress.setTitle("Adjusting");
         progress.setMessage("Wait while adjusting the estimotes...");
-        progress.show();
+        if(stillLearning)
+            progress.show();
         /* Initialize estimote Log File */
         File estimoteLogFile = new File(Environment.getExternalStoragePublicDirectory(
                 Environment.DIRECTORY_DOCUMENTS), "Estimote Log File.txt");
@@ -246,10 +248,16 @@ public class RoomFragment extends MyFragment implements SensorEventListener {
                     accessPoints.add(accessPoint);
                 }
                 finishedScan = true;
+                if(!stillLearning)
+                    http.getFingerPrintLocation(getFragmentManager().findFragmentByTag("RoomFragment"), accessPoints, getRoom().getRoomID());
             }
         };
         getActivity().registerReceiver(wifiReceiver, new IntentFilter(WifiManager.SCAN_RESULTS_AVAILABLE_ACTION));
+
+
     }
+
+
 
 
     public void connectBeaconManager(){
@@ -264,7 +272,7 @@ public class RoomFragment extends MyFragment implements SensorEventListener {
         });
         getBeaconManager().setRangingListener(new BeaconManager.RangingListener() {
             public void onBeaconsDiscovered(Region region, List<Beacon> list) {
-                if(list.size() < 3)
+                if(list.size() < 3 || !stillLearning)
                     return ;
                 Boolean progressBoolean = true;
                 Coordinate sum = null;
@@ -380,7 +388,8 @@ public class RoomFragment extends MyFragment implements SensorEventListener {
             humanMarker.setLayoutParams(params);
             if(finishedScan) {
                 finishedScan = false;
-                http.addFingerPrint(this, accessPoints, sum, getRoom().getRoomID());
+                if(stillLearning)
+                    http.addFingerPrint(this, accessPoints, sum, getRoom().getRoomID());
             }
     }
 

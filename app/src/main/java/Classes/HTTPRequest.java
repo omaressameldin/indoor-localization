@@ -13,6 +13,7 @@ import android.util.Log;
 import android.view.View;
 import android.view.WindowManager;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import com.android.volley.AuthFailureError;
 import com.android.volley.Request;
@@ -39,6 +40,7 @@ import Fragments.RoomFragment;
 import Fragments.RoomsListFragment;
 
 import static com.example.oessa_000.countsteps.MainActivity.changeFragment;
+import static com.example.oessa_000.countsteps.MainActivity.getMainActivity;
 import static com.example.oessa_000.countsteps.MainActivity.setRoom;
 
 /**
@@ -481,6 +483,47 @@ public class HTTPRequest {
                 } catch (UnsupportedEncodingException e) {
                     e.printStackTrace();
                 }
+            }
+        }){
+            @Override
+            public Map<String, String> getHeaders() throws AuthFailureError {
+                HashMap<String, String> headers = new HashMap<String, String>();
+                headers.put("Content-Type", "application/json; charset=utf-8");
+                return headers;
+            }
+        };
+        queue.add(addRoomEstimotesRequest);
+    }
+
+    public void getFingerPrintLocation(final Fragment f, ArrayList<HashMap<String,String>> accessPoints, int roomID){
+        HashMap<String,Object> infoToFindFingerPrint= new  HashMap<String,Object>  ();
+        Log.e("Number of accespoints",accessPoints.size()+"");
+        infoToFindFingerPrint.put("accesspoints", accessPoints);
+        infoToFindFingerPrint.put("room_id", roomID);
+
+
+        RequestQueue queue = Volley.newRequestQueue(f.getActivity());
+        JsonObjectRequest addRoomEstimotesRequest = new JsonObjectRequest(Request.Method.POST, "https://localization-omaressameldin1.c9users.io/fingerprints/findlocation", new JSONObject(infoToFindFingerPrint),
+                new Response.Listener<JSONObject>() {
+                    @Override
+                    public void onResponse(JSONObject response) {
+                        try {
+                            ((RoomFragment)f).setLocation(new Coordinate(Float.parseFloat(response.get("xpos").toString()), Float.parseFloat(response.get("ypos").toString())));
+                        } catch (JSONException e) {
+                            e.printStackTrace();
+                        }
+                    }
+                }, new Response.ErrorListener() {
+            @Override
+            public void onErrorResponse(VolleyError error) {
+
+                try {
+                    Log.e("FingerprintERROR",  new String(error.networkResponse.data,"UTF-8"));
+                } catch (UnsupportedEncodingException e) {
+                    e.printStackTrace();
+                }
+                Toast.makeText( getMainActivity(), "ServerError",
+                        Toast.LENGTH_SHORT).show();
             }
         }){
             @Override
