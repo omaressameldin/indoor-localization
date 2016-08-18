@@ -12,7 +12,6 @@ import java.util.Arrays;
 public class Room {
     private RoomEstimote[] roomEstimotes;
     private double[] rssis;
-    private Circular2DArray distances;
     private float scaleFactor ;
     private float xTranslation;
     private float yTranslation;
@@ -30,7 +29,6 @@ public class Room {
         setMinValueOfCoordinates();
         rssis = new double[coordinates.size()];
         Arrays.fill(rssis,99);
-        distances = new Circular2DArray(coordinates.size(), 15);
     }
 
     public float getlongestDistance(){
@@ -100,10 +98,6 @@ public class Room {
     }
 
     public double getApproximateDistance(int index){
-//        distances.setStandardDeviation(index);
-//        distances.add(index, distance);
-//        return distances.getLowPassFiltered(index);
-//        return distances.getSmallest(index);
         return roomEstimotes[index].getApproximateDistance();
     }
 
@@ -144,5 +138,4 @@ public class Room {
     public float getScaleFactor(){
         return this.scaleFactor;
     }
-    public Circular2DArray getDistances(){return distances;}
 }

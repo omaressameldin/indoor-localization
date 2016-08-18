@@ -1,12 +1,9 @@
 package com.example.oessa_000.countsteps;
 
 import android.app.Activity;
-import android.app.ListFragment;
 import android.os.Bundle;
-import android.support.v4.app.Fragment;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.Toolbar;
-import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
 
@@ -16,11 +13,7 @@ import com.estimote.sdk.SystemRequirementsChecker;
 import Classes.Coordinate;
 import Classes.MyFragment;
 import Classes.Room;
-import Fragments.EstimoteFragment;
-import Fragments.InitialFragment;
-import Fragments.RoomFragment;
 import Fragments.RoomsListFragment;
-import Fragments.TestFragment;
 
 public class MainActivity extends AppCompatActivity {
 

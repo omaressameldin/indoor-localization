@@ -361,7 +361,7 @@ public class RoomFragment extends MyFragment implements SensorEventListener {
                 } catch (IOException e) {
                     e.printStackTrace();
                 }
-                Snackbar.make(getActivity().findViewById(R.id.rl), "Macs: " + macs, Snackbar.LENGTH_LONG).setAction("Action", null).show();
+//                Snackbar.make(getActivity().findViewById(R.id.rl), "Macs: " + macs, Snackbar.LENGTH_LONG).setAction("Action", null).show();
                 setLocation(approximateLocation);
             }
         });
@@ -374,7 +374,7 @@ public class RoomFragment extends MyFragment implements SensorEventListener {
         if(sum.getSecond() < getRoom().getMinValueOfCoordinates().getSecond() || sum.getSecond() > getRoom().getMaxValueOfCoordinates().getSecond() )
             sum.setSecond(approximateLocation.getSecond());
         location = sum;
-//            Snackbar.make(getActivity().findViewById(R.id.rl), "location: (" + sum.getFirst() + " , " + sum.getSecond() + ")", Snackbar.LENGTH_LONG).setAction("Action", null).show();
+            Snackbar.make(getActivity().findViewById(R.id.rl), "location: (" + sum.getFirst() + " , " + sum.getSecond() + ")", Snackbar.LENGTH_LONG).setAction("Action", null).show();
             params.leftMargin = (int)(sum.getFirst() * getRoom().getScaleFactor() + getRoom().getXTranslation()) - 48;
             params.topMargin = (int)(sum.getSecond() * getRoom().getScaleFactor() + getRoom().getYTranslation());
             humanMarker.setLayoutParams(params);
