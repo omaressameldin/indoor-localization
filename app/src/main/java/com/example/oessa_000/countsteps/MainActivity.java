@@ -27,6 +27,7 @@ public class MainActivity extends AppCompatActivity {
     static Room room;
     static String fragmentTag;
     static BeaconManager beaconManager;
+    private static Activity mainActivity;
     @Override
     protected void onCreate(Bundle savedInstanceState) {
             super.onCreate(savedInstanceState);
@@ -34,6 +35,7 @@ public class MainActivity extends AppCompatActivity {
         Toolbar toolbar = (Toolbar) findViewById(R.id.toolbar);
         setSupportActionBar(toolbar);
         beaconManager = new BeaconManager(getApplicationContext());
+        mainActivity = this;
         changeFragment(this,new RoomsListFragment(),"RoomsListFragment");
     }
 
@@ -105,5 +107,9 @@ public class MainActivity extends AppCompatActivity {
         else
             super.onBackPressed();
 
+    }
+
+    public static Activity getMainActivity(){
+        return mainActivity;
     }
 }

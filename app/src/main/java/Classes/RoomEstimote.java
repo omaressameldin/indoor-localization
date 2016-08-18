@@ -1,6 +1,10 @@
 package Classes;
 
+import android.widget.Toast;
+
 import java.util.ArrayList;
+
+import static com.example.oessa_000.countsteps.MainActivity.getMainActivity;
 
 /**
  * Created by oessa_000 on 7/25/2016.
@@ -10,7 +14,7 @@ public class RoomEstimote {
     private int baseRSSI;
     private String beaconID;
     private double standardDeviation;
-    private int  rssiArrayIndex;
+    private int  oldestRSSIIndex;
     private double currentRSSI;
     private ArrayList<Integer> allRSSIs;
     private int size = 10;
@@ -24,7 +28,7 @@ public class RoomEstimote {
         this.baseRSSI = baseRSSI;
         this.beaconID = beaconID;
         standardDeviation = 0;
-        rssiArrayIndex = 0;
+        oldestRSSIIndex = 0;
         currentRSSI = 0;
         allRSSIs = new ArrayList<Integer>();
     }
@@ -35,11 +39,15 @@ public class RoomEstimote {
     }
 
     public void addRSSIValue(int RSSI){
+//        currentRSSI = (currentRSSI != 0)? alpha*currentRSSI + (1-alpha) * RSSI: RSSI;
+
         /* low pass filter on new RSSI value */
         int lowPassFilteredRSSI = (currentRSSI !=  0)?(int)(alpha *currentRSSI + (1-alpha) * RSSI) : RSSI ;
         /* if no standard deviation set yet just add the value */
-        if(standardDeviation == 0) {
+        if(avg == 0) {
+            currentRSSI = lowPassFilteredRSSI;
             allRSSIs.add(lowPassFilteredRSSI);
+
             if(allRSSIs.size() == size){
                  /* set the first standard deviation after getting 10 values */
                 standardDeviationFilter();
@@ -48,7 +56,12 @@ public class RoomEstimote {
         /* else check if the difference is lower than the standard deviation */
         else  if(Math.abs(avg - lowPassFilteredRSSI) < standardDeviation){
             currentRSSI = lowPassFilteredRSSI;
-            allRSSIs.set(rssiArrayIndex ++, lowPassFilteredRSSI);
+            if(allRSSIs.size() == size)
+                allRSSIs.set(oldestRSSIIndex++, lowPassFilteredRSSI);
+            else
+                allRSSIs.add(oldestRSSIIndex++, lowPassFilteredRSSI);
+            if(oldestRSSIIndex == size )
+                oldestRSSIIndex = 0;
             /* set the new standard deviation value */
             standardDeviationFilter();
         }
@@ -63,6 +76,7 @@ public class RoomEstimote {
         }
         avg = avg/allRSSIs.size() ;
         /* calculate standard deviation of RSSI values */
+        standardDeviation = 0;
         for(int i = 0; i<allRSSIs.size(); i++){
             standardDeviation += Math.pow((allRSSIs.get(i) - avg), 2);
         }
@@ -91,7 +105,7 @@ public class RoomEstimote {
     }
 
     public double getApproximateDistance(){
-        if(currentRSSI == 0)
+        if(avg == 0)
             return -1;
         if( Math.abs(baseRSSI - currentRSSI) < 5 )
             return 0.0;
@@ -102,7 +116,7 @@ public class RoomEstimote {
         else if( Math.abs(baseRSSI - currentRSSI) < 30)
             return 1.5;
         else
-            return 3.0;
+            return 100;
     }
 
 }

@@ -3,6 +3,7 @@ package Fragments;
 import android.Manifest;
 import android.annotation.TargetApi;
 import android.app.Activity;
+import android.app.ProgressDialog;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
@@ -20,6 +21,7 @@ import android.net.wifi.ScanResult;
 import android.net.wifi.WifiManager;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Environment;
 import android.support.design.widget.FloatingActionButton;
 import android.support.design.widget.Snackbar;
 import android.util.DisplayMetrics;
@@ -38,6 +40,12 @@ import com.example.oessa_000.countsteps.R;
 
 import org.json.JSONObject;
 
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.PrintWriter;
+import java.io.UnsupportedEncodingException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -65,6 +73,7 @@ public class RoomFragment extends MyFragment implements SensorEventListener {
     /* Location Variables */
     private ArrayList<Pair> estimoteCoordinates = new ArrayList<Pair>();
     private Coordinate location;
+    private Coordinate approximateLocation;
     /* Step Counter Variables */
     private int stepCount = 0;
     private double prevY;
@@ -86,9 +95,11 @@ public class RoomFragment extends MyFragment implements SensorEventListener {
     private boolean finishedScan = false;
     /* Floating Action Button */
     private FloatingActionButton addRoomButton;
-
-    public RoomFragment(){}
-
+    /* Setup wait Variable */
+    ProgressDialog progress;
+    /*Estimotes Log File */
+    File estimoteLogFile;
+   public RoomFragment(){}
     public RoomFragment(int walkingDirection){
         this.walkingDirection = walkingDirection;
     }
@@ -104,6 +115,21 @@ public class RoomFragment extends MyFragment implements SensorEventListener {
         mainWifiManager = (WifiManager) getActivity().getSystemService(Context.WIFI_SERVICE);
         /* Initialize http */
         http = new HTTPRequest();
+        /* add a loader */
+        progress = new ProgressDialog(this.getActivity());
+        progress.setTitle("Adjusting");
+        progress.setMessage("Wait while adjusting the estimotes...");
+        progress.show();
+        /* Initialize estimote Log File */
+        File estimoteLogFile = new File(Environment.getExternalStoragePublicDirectory(
+                Environment.DIRECTORY_DOCUMENTS), "Estimote Log File.txt");
+        if (!estimoteLogFile.exists()) {
+            try {
+                estimoteLogFile.createNewFile();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
         /* Draw the Room*/
         drawRoom();
         /* Set up Transfer Learning */
@@ -223,43 +249,8 @@ public class RoomFragment extends MyFragment implements SensorEventListener {
             }
         };
         getActivity().registerReceiver(wifiReceiver, new IntentFilter(WifiManager.SCAN_RESULTS_AVAILABLE_ACTION));
-
     }
 
-
-    public ArrayList<Pair> mergeSortBeacons(ArrayList<Pair> notSorted, int start, int end){
-        if(start - end == 0) {
-            ArrayList<Pair> p = new ArrayList<Pair>();
-            p.add(notSorted.get(start));
-            return p;
-        }
-
-        ArrayList<Pair> sorted = new ArrayList<Pair>();
-        ArrayList<Pair> leftHalf = mergeSortBeacons(notSorted, start, start + (end - start)/2);
-        ArrayList<Pair> rightHalf = mergeSortBeacons(notSorted, start + 1 + (end - start)/2 , end);
-
-        int i = 0;
-        int j = 0;
-        while (i < leftHalf.size() && j < rightHalf.size()){
-            if(getRoom().getRSSI(((int)leftHalf.get(i).second)) > getRoom().getRSSI(((int)rightHalf.get(j).second))){
-                sorted.add(leftHalf.get(i));
-                i++;
-            }
-            else{
-                sorted.add(rightHalf.get(j));
-                j++;
-            }
-        }
-        while(i<leftHalf.size()){
-            sorted.add(leftHalf.get(i));
-            i++;
-        }
-        while(j<rightHalf.size()){
-            sorted.add(rightHalf.get(j));
-            j++;
-        }
-        return sorted;
-    }
 
     public void connectBeaconManager(){
         getBeaconManager().connect(new BeaconManager.ServiceReadyCallback() {
@@ -273,55 +264,49 @@ public class RoomFragment extends MyFragment implements SensorEventListener {
         });
         getBeaconManager().setRangingListener(new BeaconManager.RangingListener() {
             public void onBeaconsDiscovered(Region region, List<Beacon> list) {
-
                 if(list.size() < 3)
                     return ;
-                Log.e("Step Count", stepCount+"");
-                Log.e("Walking Direction", walkingDirection+"");
-
+                Boolean progressBoolean = true;
                 Coordinate sum = null;
                 ArrayList<Pair> discovered = new ArrayList<Pair>();
-                Log.e("RoomEstimotes Size", getRoom().getCoordinates().length+"");
-                for(Beacon b : list){
+             for(Beacon b : list){
                     int index = getRoom().findBeacon(b.getMacAddress().toString());
                     if(index != -1) {
+//                        if(!getRoom().getMacAddress(index).contains("FE") &&
+//                                !getRoom().getMacAddress(index).contains("B9") &&
+//                                ! getRoom().getMacAddress(index).contains("F1")) {
+//                            continue;
+//                        }
                         getRoom().addRSSI(index, b.getRssi());
-                        discovered.add(new Pair(b, index));
                         double distance = getRoom().getApproximateDistance(index);
-                        Log.e("mac", b.getMacAddress().toString() );
-                        Log.e("Base RSSI", getRoom().getBaseRSSI(index)+"");
-                        Log.e("RSSI", getRoom().getRSSI(index)+"");
-
-
-//                        Snackbar.make(getActivity().findViewById(R.id.rl), "mac: " +b.getMacAddress()+ "\ndistance: " + distance, Snackbar.LENGTH_LONG).setAction("Action", null).show();
+//                        if(distance >2)
+//                            continue;
+                        discovered.add(new Pair(b, index));
                         if(distance == 0.0){
-//                            Snackbar.make(getActivity().findViewById(R.id.rl), "mac: " +b.getMacAddress()+ "\ndistance: " + distance, Snackbar.LENGTH_LONG).setAction("Action", null).show();
                             sum = getRoom().getLocation(index);
                             stepCount = 0;
                             setLocation(sum);
                         }
+                        if(distance == -1)
+                            progressBoolean = false;
                     }
                 }
+                if(progressBoolean)
+                    progress.dismiss();
                 if(sum != null || discovered.size() < 3 || stepCount == 0 )
                     return;
                 int tempStepCount = stepCount;
                 stepCount = 0;
-//                ArrayList<Pair> sortedBeacons = mergeSortBeacons(discovered,0,discovered.size() -1);
                 ArrayList<Pair> sortedBeacons = discovered;
-
-
-                double[] xArray= new double[sortedBeacons.size()];
-                double[] yArray= new double[sortedBeacons.size()];
-                double[] rArray= new double[sortedBeacons.size()];
-                Coordinate approximateLocation = new Coordinate(location.getFirst(), location.getSecond());
+                approximateLocation = new Coordinate(location.getFirst(), location.getSecond());
                 if(walkingDirection == 1)
-                    approximateLocation.setFirst(approximateLocation.getFirst()+(tempStepCount * 0.76f));
+                    approximateLocation.setSecond(approximateLocation.getSecond()+(tempStepCount * 0.76f));
                 else if(walkingDirection == 2)
-                    approximateLocation.setFirst(approximateLocation.getFirst()-(tempStepCount * 0.76f));
+                    approximateLocation.setSecond(approximateLocation.getSecond()-(tempStepCount * 0.76f));
                 else if(walkingDirection == 3)
-                    approximateLocation.setFirst(approximateLocation.getSecond()+(tempStepCount * 0.76f));
+                    approximateLocation.setFirst(approximateLocation.getFirst()+(tempStepCount * 0.76f));
                 else if(walkingDirection == 4)
-                    approximateLocation.setFirst(approximateLocation.getSecond()-(tempStepCount * 0.76f));
+                    approximateLocation.setFirst(approximateLocation.getFirst()-(tempStepCount * 0.76f));
                 for(int i = 0; i< sortedBeacons.size() ; i++){
                     int indexOfClosestSoFar = i;
                     double shortestDistanceSoFar = approximateLocation.computeDistance(getRoom().getLocation((int)sortedBeacons.get(i).second));
@@ -336,51 +321,62 @@ public class RoomFragment extends MyFragment implements SensorEventListener {
                     sortedBeacons.set(i, sortedBeacons.get(indexOfClosestSoFar));
                     sortedBeacons.set(indexOfClosestSoFar,temp );
                 }
-                String mac = "";
-                for(int i = 0, j=0; i< sortedBeacons.size(); i ++){
-                    if(!getRoom().getMacAddress((int)sortedBeacons.get(i).second).contains("FE") &&
-                            !getRoom().getMacAddress((int)sortedBeacons.get(i).second).contains("D2") &&
-                            ! getRoom().getMacAddress((int)sortedBeacons.get(i).second).contains("F1")) {
-                        continue;
-                    }
-                    xArray[j] = getRoom().getLocation((int)sortedBeacons.get(i).second).getFirst();
-                    yArray[j] = getRoom().getLocation((int)sortedBeacons.get(i).second).getSecond();
-                    rArray[j] = getRoom().getApproximateDistance((int)sortedBeacons.get(i).second);
-                    if(rArray[j] == -1)
+                FileOutputStream outputStream = null;
+                try {
+                     outputStream = new FileOutputStream(   new File(Environment.getExternalStoragePublicDirectory(
+                             Environment.DIRECTORY_DOCUMENTS), "Estimote Log File.txt"), true);
+                } catch (FileNotFoundException e) {
+                    e.printStackTrace();
+                }
+                double[] xArray= new double[3];
+                double[] yArray= new double[3];
+                double[] rArray= new double[3];
+                String macs = "";
+                for(int i = 0; i< 3; i ++){
+                    xArray[i] = getRoom().getLocation((int)sortedBeacons.get(i).second).getFirst();
+                    yArray[i] = getRoom().getLocation((int)sortedBeacons.get(i).second).getSecond();
+                    rArray[i] = getRoom().getApproximateDistance((int)sortedBeacons.get(i).second);
+                    if(rArray[i] == -1)
                         return;
-                    j++;
-                    Log.e("Mac Adress",getRoom().getMacAddress((int)sortedBeacons.get(i).second));
-//                    mac += getRoom().getMacAddress((int)sortedBeacons.get(i).second) + "   ";
-                    Log.e("xpostion",xArray[i]+"");
-                    Log.e("ypostion",yArray[i]+"");
-                    Log.e("RSSI", getRoom().getRSSI((int)sortedBeacons.get(i).second)+"");
-                    Log.e("distance",rArray[i]+"");
+                    macs += getRoom().getMacAddress((int)sortedBeacons.get(i).second)+"   ";
+                    try {
+                        outputStream.write(("Estimote "+i+":\n").getBytes());
+                        outputStream.write(("Mac:"+ getRoom().getMacAddress((int)sortedBeacons.get(i).second)+"\n").getBytes());
+                        outputStream.write(("Base RSSI:"+ getRoom().getBaseRSSI((int)sortedBeacons.get(i).second)+"\n").getBytes());
+                        outputStream.write(("RSSI:"+ getRoom().getRSSI((int)sortedBeacons.get(i).second)+"\n").getBytes());
+                        outputStream.write(("x-postion:"+ xArray[i]+"\n").getBytes());
+                        outputStream.write(("y-postion:"+ yArray[i]+"\n").getBytes());
+                        outputStream.write(("Distance:"+ rArray[i]+"\n").getBytes());
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    }
                 }
-                Snackbar.make(getActivity().findViewById(R.id.rl), mac, Snackbar.LENGTH_LONG).setAction("Action", null).show();
-                if(sum == null){
-                    int x = (int)computeX(xArray[0], xArray[1], xArray[2], yArray[0], yArray[1], yArray[2], rArray[0], rArray[1], rArray[2]);
-                    int y = (int) computeY(xArray[0], xArray[1], yArray[0], yArray[1], rArray[0], rArray[1], x);
-                    sum = new Coordinate(x,y);
-                    setLocation(sum);
+                int x = (int)computeX(xArray[0], xArray[1], xArray[2], yArray[0], yArray[1], yArray[2], rArray[0], rArray[1], rArray[2]);
+                int y = (int) computeY(xArray[0], xArray[1], yArray[0], yArray[1], rArray[0], rArray[1], x);
+                sum = new Coordinate(x,y);
+                try {
+                    outputStream.write(("location: ("+x+", "+y+")\n").getBytes());
+                    outputStream.write(("--------------------------------------------------------------------\n").getBytes());
+                    outputStream.close();
+                } catch (IOException e) {
+                    e.printStackTrace();
                 }
+                Snackbar.make(getActivity().findViewById(R.id.rl), "Macs: " + macs, Snackbar.LENGTH_LONG).setAction("Action", null).show();
+                setLocation(approximateLocation);
             }
         });
     }
 
 
     public void setLocation(Coordinate sum){
-        if(sum.getFirst() < getRoom().getMinValueOfCoordinates().getFirst())
-            sum.setFirst(getRoom().getMinValueOfCoordinates().getFirst());
-        if(sum.getFirst() > getRoom().getMaxValueOfCoordinates().getFirst())
-            sum.setFirst(getRoom().getMaxValueOfCoordinates().getFirst());
-        if(sum.getSecond() < getRoom().getMinValueOfCoordinates().getSecond())
-            sum.setSecond(getRoom().getMinValueOfCoordinates().getSecond());
-        if(sum.getSecond() > getRoom().getMaxValueOfCoordinates().getSecond())
-            sum.setSecond(getRoom().getMaxValueOfCoordinates().getSecond());
+        if(sum.getFirst() < getRoom().getMinValueOfCoordinates().getFirst() || sum.getFirst() > getRoom().getMaxValueOfCoordinates().getFirst() )
+            sum.setFirst(approximateLocation.getFirst());
+        if(sum.getSecond() < getRoom().getMinValueOfCoordinates().getSecond() || sum.getSecond() > getRoom().getMaxValueOfCoordinates().getSecond() )
+            sum.setSecond(approximateLocation.getSecond());
         location = sum;
-            Snackbar.make(getActivity().findViewById(R.id.rl), "location: (" + sum.getFirst() + " , " + sum.getSecond() + ")", Snackbar.LENGTH_LONG).setAction("Action", null).show();
-            params.leftMargin = (int)(sum.getFirst() * getRoom().getScaleFactor() + getRoom().getXTranslation()) + 100;
-            params.topMargin = (int)(sum.getSecond() * getRoom().getScaleFactor() + getRoom().getYTranslation()) + 100;
+//            Snackbar.make(getActivity().findViewById(R.id.rl), "location: (" + sum.getFirst() + " , " + sum.getSecond() + ")", Snackbar.LENGTH_LONG).setAction("Action", null).show();
+            params.leftMargin = (int)(sum.getFirst() * getRoom().getScaleFactor() + getRoom().getXTranslation()) - 48;
+            params.topMargin = (int)(sum.getSecond() * getRoom().getScaleFactor() + getRoom().getYTranslation());
             humanMarker.setLayoutParams(params);
             if(finishedScan) {
                 finishedScan = false;
@@ -388,8 +384,8 @@ public class RoomFragment extends MyFragment implements SensorEventListener {
             }
     }
 
-    public double computeX(double x1, double x2, double x3, double y1, double y2, double y3, double r1, double r2, double r3){
 
+    public double computeX(double x1, double x2, double x3, double y1, double y2, double y3, double r1, double r2, double r3){
         double eq1 = r3*r3 - r2*r2 - x3*x3 - y3*y3 +x2*x2 + y2 * y2 ;
         double eq2 = r1*r1 - r2*r2 - x1*x1 -y1*y1 + x2*x2 +y2*y2 ;
         double eq3 = 2*y2 - 2*y3;
@@ -397,7 +393,6 @@ public class RoomFragment extends MyFragment implements SensorEventListener {
         double eq5 = eq2 * eq3;
         double eq6 = eq5/eq4;
         double numerator = eq1 - eq6;
-
         double eq7 = -2*x3 +2*x2;
         double eq8 = -2*x1 + 2*x2;
         double eq9 = 2*y2 - 2*y3;
@@ -405,20 +400,19 @@ public class RoomFragment extends MyFragment implements SensorEventListener {
         double eq11 = eq8 * eq9;
         double eq12 = eq11 / eq10;
         double denominator = eq7 - eq12;
-
         return numerator / denominator;
     }
+
 
     public double computeY(double x1, double x2, double y1, double y2, double r1, double r2, double x){
         double eq1 = r1*r1 - r2*r2 - x1*x1 - y1*y1 +x2*x2 +y2*y2;
         double eq2 = -2*x1 + 2*x2;
         double eq3 = x*eq2;
         double numerator = eq1 - eq3;
-
         double denominator = -2*y1+ 2*y2;
-
         return numerator / denominator;
     }
+
 
     public void onResume() {
         super.onResume();
@@ -426,7 +420,6 @@ public class RoomFragment extends MyFragment implements SensorEventListener {
         mSensorManager = (SensorManager) getActivity().getSystemService(Context.SENSOR_SERVICE);
         mSensorGravity = mSensorManager.getDefaultSensor(Sensor.TYPE_GRAVITY);
         mSensorGyroscope = mSensorManager.getDefaultSensor(Sensor.TYPE_GYROSCOPE);
-
         /* Set Sensors Delay */
         mSensorManager.registerListener(this, mSensorGravity,
                 SensorManager.SENSOR_DELAY_NORMAL);
@@ -456,7 +449,6 @@ public class RoomFragment extends MyFragment implements SensorEventListener {
                     if(turningNow){
                         if(Math.abs(event.values[2]) < 0.3){
                             turningNow = false;
-
                         }
                     }
                         /*
@@ -511,6 +503,7 @@ public class RoomFragment extends MyFragment implements SensorEventListener {
     public void onAccuracyChanged(Sensor sensor, int accuracy) {
 
     }
+
 
 
 }
