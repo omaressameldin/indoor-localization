@@ -1,0 +1,11 @@
+# Fisher's Iris flower data set
+
+data:
+- url: examples/data/iris.json
+mapping:
+  x: $sepalLength
+  y: $petalLength
+  fill: $species
+  opacity: 0.5
+layers:
+- type: point

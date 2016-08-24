@@ -1,0 +1,15 @@
+- axis titles
+- legends
+- group support
+- facet support
+- vertically centered labels
+- everything is an expression
+- ask each geom for its extents (right now aesthetics inferred by geoms don't go into calculating scales)
+- assume unrecognized layer-level properties are mapping properties
+- allow using ValueRefs to be explicit?
+
+Error reporting
+- when variables not present in data are used
+- when an aesthetic is associated with a constant not present in its scale's range
+- when a discrete aesthetic (e.g. shape) is associated with a continuous variable
+- when a geom doesn't have all the aesthetics that it needs (e.g. bar needs x and y)

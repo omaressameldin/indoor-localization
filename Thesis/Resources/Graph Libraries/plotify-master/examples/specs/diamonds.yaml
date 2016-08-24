@@ -1,0 +1,21 @@
+# A 5000-sample diamond data set
+
+data:
+- url: examples/data/dsmall.csv
+  format:
+    type: csv
+    parse:
+      carat: number
+      depth: number
+      table: number
+      price: number
+      x: number
+      y: number
+      z: number
+mapping:
+  x: $carat
+  y: $price
+  size: 20
+  opacity: 0.3
+layers:
+- type: point
