@@ -74,7 +74,7 @@ public class RoomFragment extends MyFragment implements SensorEventListener {
     private ArrayList<Pair> estimoteCoordinates = new ArrayList<Pair>();
     private Coordinate location;
     private Coordinate approximateLocation;
-    private boolean stillLearning = false ; //true if estimtoes & false if fingerprinting
+    private boolean stillLearning = true ; //true if estimtoes & false if fingerprinting
     /* Step Counter Variables */
     private int stepCount = 0;
     private double prevY;
@@ -122,16 +122,6 @@ public class RoomFragment extends MyFragment implements SensorEventListener {
         progress.setMessage("Wait while adjusting the estimotes...");
         if(stillLearning)
             progress.show();
-        /* Initialize estimote Log File */
-        File estimoteLogFile = new File(Environment.getExternalStoragePublicDirectory(
-                Environment.DIRECTORY_DOCUMENTS), "Estimote Log File.txt");
-        if (!estimoteLogFile.exists()) {
-            try {
-                estimoteLogFile.createNewFile();
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
-        }
         /* Draw the Room*/
         drawRoom();
         /* Set up Transfer Learning */
@@ -214,6 +204,7 @@ public class RoomFragment extends MyFragment implements SensorEventListener {
     }
 
     public void startLearning() {
+        /* check if marshamllow or more to ask for permission then start scannign for wifi */
         if ((android.os.Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && getActivity().checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED)
                 || (android.os.Build.VERSION.SDK_INT < Build.VERSION_CODES.M)) {
             Thread t = new Thread() {
@@ -230,7 +221,6 @@ public class RoomFragment extends MyFragment implements SensorEventListener {
             };
             t.start();
             recordLearning();
-
         }
     }
 
@@ -239,6 +229,7 @@ public class RoomFragment extends MyFragment implements SensorEventListener {
         wifiReceiver = new BroadcastReceiver(){
             @Override
             public void onReceive(Context context, Intent intent) {
+                /* get wifi scan results */
                 List<ScanResult>results = mainWifiManager.getScanResults();
                 accessPoints = new ArrayList<HashMap<String, String>>();
                 for(ScanResult r : results){
@@ -248,13 +239,12 @@ public class RoomFragment extends MyFragment implements SensorEventListener {
                     accessPoints.add(accessPoint);
                 }
                 finishedScan = true;
+                /* if fingerpringint localization is enabled get location from databse */
                 if(!stillLearning)
                     http.getFingerPrintLocation(getFragmentManager().findFragmentByTag("RoomFragment"), accessPoints, getRoom().getRoomID());
             }
         };
         getActivity().registerReceiver(wifiReceiver, new IntentFilter(WifiManager.SCAN_RESULTS_AVAILABLE_ACTION));
-
-
     }
 
 
@@ -272,40 +262,42 @@ public class RoomFragment extends MyFragment implements SensorEventListener {
         });
         getBeaconManager().setRangingListener(new BeaconManager.RangingListener() {
             public void onBeaconsDiscovered(Region region, List<Beacon> list) {
+                /* if less than 3 beaoons are discovered return or wifi fingerprinting is enabled */
                 if(list.size() < 3 || !stillLearning)
                     return ;
+                /* add boolean to check if still setting up standard deviation */
                 Boolean progressBoolean = true;
                 Coordinate sum = null;
+                /* add estimotes related to the room */
                 ArrayList<Pair> discovered = new ArrayList<Pair>();
              for(Beacon b : list){
                     int index = getRoom().findBeacon(b.getMacAddress().toString());
                     if(index != -1) {
-//                        if(!getRoom().getMacAddress(index).contains("FE") &&
-//                                !getRoom().getMacAddress(index).contains("B9") &&
-//                                ! getRoom().getMacAddress(index).contains("F1")) {
-//                            continue;
-//                        }
                         getRoom().addRSSI(index, b.getRssi());
                         double distance = getRoom().getApproximateDistance(index);
-//                        if(distance >2)
-//                            continue;
                         discovered.add(new Pair(b, index));
+                        /* if too close from an estimote then user has same position */
                         if(distance == 0.0){
                             sum = getRoom().getLocation(index);
                             stepCount = 0;
                             setLocation(sum);
                         }
+                        /* if still settign up set progress boolean to false */
                         if(distance == -1)
                             progressBoolean = false;
                     }
                 }
+                /* if no more setting up remove progress bar */
                 if(progressBoolean)
                     progress.dismiss();
+                /* if the user has not moved or was too clsoe from a beacon or less than 3 beacons are discovered return */
                 if(sum != null || discovered.size() < 3 || stepCount == 0 )
                     return;
+                /* save step count and reset */
                 int tempStepCount = stepCount;
                 stepCount = 0;
                 ArrayList<Pair> sortedBeacons = discovered;
+                /* calculate approximate location based on pedometer and walking direction */
                 approximateLocation = new Coordinate(location.getFirst(), location.getSecond());
                 if(walkingDirection == 1)
                     approximateLocation.setSecond(approximateLocation.getSecond()+(tempStepCount * 0.76f));
@@ -315,6 +307,7 @@ public class RoomFragment extends MyFragment implements SensorEventListener {
                     approximateLocation.setFirst(approximateLocation.getFirst()+(tempStepCount * 0.76f));
                 else if(walkingDirection == 4)
                     approximateLocation.setFirst(approximateLocation.getFirst()-(tempStepCount * 0.76f));
+                /* sort beacons by closest to that approximate lcoation */
                 for(int i = 0; i< sortedBeacons.size() ; i++){
                     int indexOfClosestSoFar = i;
                     double shortestDistanceSoFar = approximateLocation.computeDistance(getRoom().getLocation((int)sortedBeacons.get(i).second));
@@ -329,61 +322,35 @@ public class RoomFragment extends MyFragment implements SensorEventListener {
                     sortedBeacons.set(i, sortedBeacons.get(indexOfClosestSoFar));
                     sortedBeacons.set(indexOfClosestSoFar,temp );
                 }
-                FileOutputStream outputStream = null;
-                try {
-                     outputStream = new FileOutputStream(   new File(Environment.getExternalStoragePublicDirectory(
-                             Environment.DIRECTORY_DOCUMENTS), "Estimote Log File.txt"), true);
-                } catch (FileNotFoundException e) {
-                    e.printStackTrace();
-                }
+                /* calculate position from closest three beacons */
                 double[] xArray= new double[3];
                 double[] yArray= new double[3];
                 double[] rArray= new double[3];
-                String macs = "";
                 for(int i = 0; i< 3; i ++){
                     xArray[i] = getRoom().getLocation((int)sortedBeacons.get(i).second).getFirst();
                     yArray[i] = getRoom().getLocation((int)sortedBeacons.get(i).second).getSecond();
                     rArray[i] = getRoom().getApproximateDistance((int)sortedBeacons.get(i).second);
                     if(rArray[i] == -1)
                         return;
-                    macs += getRoom().getMacAddress((int)sortedBeacons.get(i).second)+"   ";
-                    try {
-                        outputStream.write(("Estimote "+i+":\n").getBytes());
-                        outputStream.write(("Mac:"+ getRoom().getMacAddress((int)sortedBeacons.get(i).second)+"\n").getBytes());
-                        outputStream.write(("Base RSSI:"+ getRoom().getBaseRSSI((int)sortedBeacons.get(i).second)+"\n").getBytes());
-                        outputStream.write(("RSSI:"+ getRoom().getRSSI((int)sortedBeacons.get(i).second)+"\n").getBytes());
-                        outputStream.write(("x-postion:"+ xArray[i]+"\n").getBytes());
-                        outputStream.write(("y-postion:"+ yArray[i]+"\n").getBytes());
-                        outputStream.write(("Distance:"+ rArray[i]+"\n").getBytes());
-                    } catch (IOException e) {
-                        e.printStackTrace();
-                    }
                 }
                 int x = (int)computeX(xArray[0], xArray[1], xArray[2], yArray[0], yArray[1], yArray[2], rArray[0], rArray[1], rArray[2]);
                 int y = (int) computeY(xArray[0], xArray[1], yArray[0], yArray[1], rArray[0], rArray[1], x);
                 sum = new Coordinate(x,y);
-                try {
-                    outputStream.write(("location: ("+x+", "+y+")\n").getBytes());
-                    outputStream.write(("--------------------------------------------------------------------\n").getBytes());
-                    outputStream.close();
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
-//                Snackbar.make(getActivity().findViewById(R.id.rl), "Macs: " + macs, Snackbar.LENGTH_LONG).setAction("Action", null).show();
-                setLocation(approximateLocation);
+                setLocation(sum);
             }
         });
     }
 
 
     public void setLocation(Coordinate sum){
+        /* if location x or y is out of room bounds get the equivalant one from approximate location */
         if(sum.getFirst() < getRoom().getMinValueOfCoordinates().getFirst() || sum.getFirst() > getRoom().getMaxValueOfCoordinates().getFirst() )
             sum.setFirst(approximateLocation.getFirst());
         if(sum.getSecond() < getRoom().getMinValueOfCoordinates().getSecond() || sum.getSecond() > getRoom().getMaxValueOfCoordinates().getSecond() )
             sum.setSecond(approximateLocation.getSecond());
         location = sum;
             Snackbar.make(getActivity().findViewById(R.id.rl), "location: (" + sum.getFirst() + " , " + sum.getSecond() + ")", Snackbar.LENGTH_LONG).setAction("Action", null).show();
-            params.leftMargin = (int)(sum.getFirst() * getRoom().getScaleFactor() + getRoom().getXTranslation()) - 48;
+            params.leftMargin = (int)(sum.getFirst() * getRoom().getScaleFactor() + getRoom().getXTranslation());
             params.topMargin = (int)(sum.getSecond() * getRoom().getScaleFactor() + getRoom().getYTranslation());
             humanMarker.setLayoutParams(params);
             if(finishedScan) {

@@ -39,8 +39,6 @@ public class RoomEstimote {
     }
 
     public void addRSSIValue(int RSSI){
-//        currentRSSI = (currentRSSI != 0)? alpha*currentRSSI + (1-alpha) * RSSI: RSSI;
-
         /* low pass filter on new RSSI value */
         int lowPassFilteredRSSI = (currentRSSI !=  0)?(int)(alpha *currentRSSI + (1-alpha) * RSSI) : RSSI ;
         /* if no standard deviation set yet just add the value */

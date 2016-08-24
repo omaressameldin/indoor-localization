@@ -21,18 +21,23 @@ public class Room {
 
     public Room(ArrayList<RoomEstimote> coordinates, int roomID){
         this.roomID = roomID;
+        /* set room estimotes */
         this.roomEstimotes = new RoomEstimote[coordinates.size()];
         for(int i = 0; i< roomEstimotes.length; i++){
            this.roomEstimotes[i] = coordinates.get(i);
         }
+        /* set the max and min x and y positions in the room */
         setMaxValueOfCoordinates();
         setMinValueOfCoordinates();
+        /* fill rssi array with high value */
         rssis = new double[coordinates.size()];
         Arrays.fill(rssis,99);
     }
 
+    /* get longest distance in room for scaling */
     public float getlongestDistance(){
         float longestDistance = 0;
+        /* loop through all points to find the longest distance */
         for(int i= 0; i< roomEstimotes.length; i++){
             Coordinate startPoint = (Coordinate)roomEstimotes[i].getLocation();
             for(int j = i; j < roomEstimotes.length; j++ ){
@@ -49,11 +54,13 @@ public class Room {
     }
 
     public void setScaleFactor(Coordinate pixelDimensions){
+        /* divide the phone's pixel dimension by the longest distance available to get scale facotr */
         int scaleDimension = Math.min((int) pixelDimensions.getFirst(), (int) pixelDimensions.getSecond());
         scaleFactor = (roomEstimotes.length > 1 )?    scaleDimension/getlongestDistance() -1 : 0;
     }
 
     private void setMinValueOfCoordinates(){
+        /* find the smallest x and y coordinates in the room */
         minValueOfCoordinates = new Coordinate(99999,99999);
         for(int i = 0; i< roomEstimotes.length; i++){
             if(((Coordinate)roomEstimotes[i].getLocation()).getFirst() < minValueOfCoordinates.getFirst())
@@ -64,6 +71,7 @@ public class Room {
 
     }
     private void setMaxValueOfCoordinates(){
+        /* find the biggest x and y coordinates in the room */
          maxValueOfCoordinates = new Coordinate(0,0);
         for(int i = 0; i< roomEstimotes.length; i++){
             if(((Coordinate)roomEstimotes[i].getLocation()).getFirst() > maxValueOfCoordinates.getFirst())
@@ -74,6 +82,7 @@ public class Room {
     }
 
     public void addRSSI(int index, int rssi){
+        /* add a new RSSI value to an estimoe */
           roomEstimotes[index].addRSSIValue(rssi);
 
     }
